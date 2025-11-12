@@ -12,11 +12,9 @@ import {
   ChevronUp,
   AlertTriangle,
   TrendingUp,
-  Navigation,
-  Bot
+  Navigation
 } from 'lucide-react';
 import type { AlertWithStats } from '../types';
-import AICallModal from './AICallModal';
 
 interface AdminAlertCardProps {
   alert: AlertWithStats;
@@ -83,7 +81,6 @@ export default function AdminAlertCard({ alert, onResolve }: AdminAlertCardProps
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const [isResolving, setIsResolving] = useState(false);
   const [isResolved, setIsResolved] = useState(alert.resolved || false);
-  const [showAICall, setShowAICall] = useState(false);
   
   const emergencyContacts = getEmergencyContacts(alert.geometry.coordinates);
   
@@ -356,18 +353,6 @@ export default function AdminAlertCard({ alert, onResolve }: AdminAlertCardProps
                 </a>
               </div>
 
-              {/* AI Call Button */}
-              {!isResolved && (
-                <button
-                  onClick={() => setShowAICall(true)}
-                  className="w-full flex items-center justify-center space-x-3 px-6 py-4 rounded-xl font-bold text-lg transition-all duration-300 transform bg-gradient-to-r from-purple-600 via-pink-600 to-violet-600 hover:from-purple-500 hover:via-pink-500 hover:to-violet-500 hover:shadow-2xl hover:shadow-purple-500/50 hover:scale-105 text-white border-2 border-purple-500/50"
-                >
-                  <Bot className="h-7 w-7 animate-pulse" />
-                  <span>AI Auto Call & Replay</span>
-                  <span className="text-xs bg-white/20 px-2 py-1 rounded-full">New</span>
-                </button>
-              )}
-
               {/* Mark as Resolved Button */}
               {!isResolved ? (
                 <button
@@ -426,14 +411,6 @@ export default function AdminAlertCard({ alert, onResolve }: AdminAlertCardProps
             />
           </div>
         </div>
-      )}
-
-      {/* AI Call Modal */}
-      {showAICall && (
-        <AICallModal
-          alert={alert}
-          onClose={() => setShowAICall(false)}
-        />
       )}
     </>
   );

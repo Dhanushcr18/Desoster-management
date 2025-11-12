@@ -5,6 +5,7 @@ import MapView from './MapView';
 import ReportModal from './ReportModal';
 import AlertDetailsModal from './AlertDetailsModal';
 import EmergencyContacts from './EmergencyContacts';
+import ClimateReport from './ClimateReport';
 import ToastContainer from './ToastContainer';
 import { alertsAPI } from '../services/api';
 import socketService from '../services/socket';
@@ -31,7 +32,8 @@ import {
   Heart,
   Pill,
   UtensilsCrossed,
-  ChevronDown
+  ChevronDown,
+  Cloud
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -57,6 +59,7 @@ export default function Dashboard() {
   const [loadingRealData, setLoadingRealData] = useState(false);
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState<'shelter' | 'medications' | 'food' | null>(null);
+  const [showClimateReport, setShowClimateReport] = useState(false);
 
   useEffect(() => {
     loadAlerts();
@@ -388,6 +391,16 @@ export default function Dashboard() {
 
             {/* Right: User Info and Actions */}
             <div className="flex items-center space-x-4">
+              {/* Climate Report Button */}
+              <button
+                onClick={() => setShowClimateReport(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:shadow-2xl hover:scale-105 transition-all duration-300 font-bold"
+                title="Climate & Weather Report"
+              >
+                <Cloud className="h-5 w-5" />
+                <span className="hidden lg:inline">Climate</span>
+              </button>
+
               {/* Emergency Contacts Button */}
               <button
                 onClick={() => setShowEmergencyContacts(true)}
@@ -688,6 +701,13 @@ export default function Dashboard() {
           alert={selectedAlert}
           onClose={() => setShowDetailsModal(false)}
           onUpdateStatus={handleUpdateStatus}
+        />
+      )}
+
+      {/* Climate Report Modal */}
+      {showClimateReport && (
+        <ClimateReport
+          onClose={() => setShowClimateReport(false)}
         />
       )}
 
