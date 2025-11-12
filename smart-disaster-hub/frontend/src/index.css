@@ -20,6 +20,21 @@
   animation: slide-in-right 0.3s ease-out;
 }
 
+@keyframes slide-down {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-down {
+  animation: slide-down 0.2s ease-out;
+}
+
 /* Animation Delays */
 .animation-delay-100 {
   animation-delay: 100ms;

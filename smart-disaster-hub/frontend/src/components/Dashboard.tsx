@@ -26,7 +26,12 @@ import {
   Menu,
   X,
   Zap,
-  Phone
+  Phone,
+  Home as HomeIcon,
+  Heart,
+  Pill,
+  UtensilsCrossed,
+  ChevronDown
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -50,6 +55,8 @@ export default function Dashboard() {
   const [newAlertCount, setNewAlertCount] = useState(0);
   const [realWorldAlerts, setRealWorldAlerts] = useState<WeatherAlert[]>([]);
   const [loadingRealData, setLoadingRealData] = useState(false);
+  const [showHelpMenu, setShowHelpMenu] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState<'shelter' | 'medications' | 'food' | null>(null);
 
   useEffect(() => {
     loadAlerts();
@@ -59,12 +66,23 @@ export default function Dashboard() {
     // Refresh real-world data every 5 minutes
     const realDataInterval = setInterval(loadRealWorldData, 5 * 60 * 1000);
 
+    // Close help menu when clicking outside
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (showHelpMenu && !target.closest('.help-menu-container')) {
+        setShowHelpMenu(false);
+      }
+    };
+
+    document.addEventListener('click', handleClickOutside);
+
     return () => {
       socketService.offNewAlert();
       socketService.offReportUpdate();
       clearInterval(realDataInterval);
+      document.removeEventListener('click', handleClickOutside);
     };
-  }, []);
+  }, [showHelpMenu]);
 
   const loadAlerts = async () => {
     try {
@@ -425,6 +443,81 @@ export default function Dashboard() {
                 <Bell className="h-4 w-4 animate-bounce" />
                 <span className="font-medium">Test</span>
               </button>
+
+              {/* Help Menu */}
+              <div className="relative help-menu-container">
+                <button
+                  onClick={() => setShowHelpMenu(!showHelpMenu)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-lg hover:shadow-lg transition"
+                >
+                  <Heart className="h-4 w-4" />
+                  <span className="font-medium">Help</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${showHelpMenu ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Help Dropdown Menu */}
+                {showHelpMenu && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border-2 border-emerald-500/30 overflow-hidden z-50 animate-slide-down">
+                    <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3">
+                      <h3 className="text-white font-bold text-lg">Emergency Resources</h3>
+                      <p className="text-white/80 text-xs">Quick access to help</p>
+                    </div>
+                    
+                    <div className="p-2">
+                      {/* Safe Shelter */}
+                      <button
+                        className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-green-50 rounded-lg transition group"
+                        onClick={() => {
+                          setShowHelpModal('shelter');
+                          setShowHelpMenu(false);
+                        }}
+                      >
+                        <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-2 rounded-lg group-hover:scale-110 transition">
+                          <HomeIcon className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-semibold text-gray-900 text-sm">Safe Shelter</p>
+                          <p className="text-xs text-gray-500">Find nearby shelters</p>
+                        </div>
+                      </button>
+
+                      {/* Medications */}
+                      <button
+                        className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-green-50 rounded-lg transition group"
+                        onClick={() => {
+                          setShowHelpModal('medications');
+                          setShowHelpMenu(false);
+                        }}
+                      >
+                        <div className="bg-gradient-to-br from-red-500 to-pink-500 p-2 rounded-lg group-hover:scale-110 transition">
+                          <Pill className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-semibold text-gray-900 text-sm">Medications</p>
+                          <p className="text-xs text-gray-500">Emergency medical aid</p>
+                        </div>
+                      </button>
+
+                      {/* Food Resources */}
+                      <button
+                        className="w-full flex items-center space-x-3 px-4 py-3 hover:bg-green-50 rounded-lg transition group"
+                        onClick={() => {
+                          setShowHelpModal('food');
+                          setShowHelpMenu(false);
+                        }}
+                      >
+                        <div className="bg-gradient-to-br from-orange-500 to-yellow-500 p-2 rounded-lg group-hover:scale-110 transition">
+                          <UtensilsCrossed className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-semibold text-gray-900 text-sm">Food Resources</p>
+                          <p className="text-xs text-gray-500">Food banks & supplies</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
               
               <div className="flex items-center space-x-3 border-l pl-4">
                 <div className="text-right hidden sm:block">
@@ -605,8 +698,276 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Toast Notifications */}
-      <ToastContainer toasts={toasts} onClose={removeToast} />
+      {/* Help Modals */}
+      {showHelpModal === 'shelter' && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowHelpModal(null)}>
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-blue-500 to-cyan-500 p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <HomeIcon className="h-8 w-8" />
+                  <div>
+                    <h2 className="text-2xl font-bold">Safe Shelter Information</h2>
+                    <p className="text-blue-100">Find emergency shelters near you</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowHelpModal(null)} className="text-white hover:text-blue-200">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                <h3 className="font-bold text-blue-900 mb-2">🏠 Emergency Shelters</h3>
+                <p className="text-gray-700">During disasters, temporary shelters provide safe refuge for affected people.</p>
+              </div>
+              
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-gray-900">Types of Shelters:</h3>
+                
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-900 mb-2">🏫 School Buildings</h4>
+                  <p className="text-gray-600">Public schools often serve as emergency shelters with large spaces and facilities.</p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-900 mb-2">🏛️ Community Centers</h4>
+                  <p className="text-gray-600">Local community halls and centers provide temporary accommodation during emergencies.</p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-900 mb-2">⛪ Religious Buildings</h4>
+                  <p className="text-gray-600">Temples, churches, and mosques often open their doors during disasters.</p>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-900 mb-2">🏟️ Sports Stadiums</h4>
+                  <p className="text-gray-600">Large stadiums can accommodate many people in emergency situations.</p>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded">
+                <h3 className="font-bold text-yellow-900 mb-2">⚠️ What to Bring to Shelter:</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Identification documents</li>
+                  <li>Medications and medical records</li>
+                  <li>Water and non-perishable food</li>
+                  <li>Blankets and warm clothing</li>
+                  <li>Mobile phone and charger</li>
+                  <li>Emergency cash</li>
+                </ul>
+              </div>
+
+              <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                <h3 className="font-bold text-green-900 mb-2">📞 Find Shelter Near You:</h3>
+                <p className="text-gray-700 mb-2">Contact local authorities:</p>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Emergency Services: 108 / 112</li>
+                  <li>NDRF Helpline: 011-24363260</li>
+                  <li>Local Municipal Office</li>
+                  <li>Police Control Room: 100</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showHelpModal === 'medications' && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowHelpModal(null)}>
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-red-500 to-pink-500 p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Pill className="h-8 w-8" />
+                  <div>
+                    <h2 className="text-2xl font-bold">Emergency Medications</h2>
+                    <p className="text-red-100">Essential medical supplies information</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowHelpModal(null)} className="text-white hover:text-red-200">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded">
+                <h3 className="font-bold text-red-900 mb-2">💊 Emergency First Aid Kit</h3>
+                <p className="text-gray-700">Every household should maintain a basic first aid kit for emergencies.</p>
+              </div>
+              
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-gray-900">Essential Medications:</h3>
+                
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-900 mb-2">🩹 Basic Supplies</h4>
+                  <ul className="list-disc list-inside text-gray-700 space-y-1">
+                    <li>Bandages and gauze</li>
+                    <li>Antiseptic solution (Dettol, Betadine)</li>
+                    <li>Cotton and medical tape</li>
+                    <li>Scissors and tweezers</li>
+                    <li>Disposable gloves</li>
+                  </ul>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-900 mb-2">💊 Common Medicines</h4>
+                  <ul className="list-disc list-inside text-gray-700 space-y-1">
+                    <li>Paracetamol (fever, pain)</li>
+                    <li>ORS packets (dehydration)</li>
+                    <li>Antibiotic ointment</li>
+                    <li>Anti-diarrheal medicine</li>
+                    <li>Antihistamine (allergies)</li>
+                    <li>Pain relief spray</li>
+                  </ul>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-900 mb-2">🏥 Prescription Medications</h4>
+                  <ul className="list-disc list-inside text-gray-700 space-y-1">
+                    <li>Keep at least 7-day supply</li>
+                    <li>Diabetes medication/insulin</li>
+                    <li>Blood pressure medicine</li>
+                    <li>Heart medication</li>
+                    <li>Asthma inhalers</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded">
+                <h3 className="font-bold text-yellow-900 mb-2">⚠️ Important Reminders:</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Check expiry dates regularly</li>
+                  <li>Store in waterproof container</li>
+                  <li>Keep medications in original packaging</li>
+                  <li>Include written instructions</li>
+                  <li>Have backup prescription copies</li>
+                </ul>
+              </div>
+
+              <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                <h3 className="font-bold text-green-900 mb-2">📞 Emergency Medical Help:</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Ambulance: 102 / 108</li>
+                  <li>Medical Emergency: 112</li>
+                  <li>Poison Control: 1800-116-117</li>
+                  <li>Blood Bank: 104</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showHelpModal === 'food' && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowHelpModal(null)}>
+          <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-orange-500 to-yellow-500 p-6 text-white">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <UtensilsCrossed className="h-8 w-8" />
+                  <div>
+                    <h2 className="text-2xl font-bold">Food Resources</h2>
+                    <p className="text-orange-100">Emergency food supplies and assistance</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowHelpModal(null)} className="text-white hover:text-orange-200">
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="bg-orange-50 border-l-4 border-orange-500 p-4 rounded">
+                <h3 className="font-bold text-orange-900 mb-2">🍲 Emergency Food Supplies</h3>
+                <p className="text-gray-700">Essential items to store for disaster preparedness.</p>
+              </div>
+              
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold text-gray-900">Non-Perishable Foods:</h3>
+                
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-900 mb-2">🥫 Canned Foods</h4>
+                  <ul className="list-disc list-inside text-gray-700 space-y-1">
+                    <li>Canned vegetables and fruits</li>
+                    <li>Canned beans and lentils</li>
+                    <li>Canned fish (tuna, sardines)</li>
+                    <li>Canned soups</li>
+                    <li>Shelf life: 2-5 years</li>
+                  </ul>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-900 mb-2">🍚 Dry Goods</h4>
+                  <ul className="list-disc list-inside text-gray-700 space-y-1">
+                    <li>Rice, wheat, and pasta</li>
+                    <li>Dal (lentils) - toor, moong, chana</li>
+                    <li>Dry fruits and nuts</li>
+                    <li>Biscuits and crackers</li>
+                    <li>Instant noodles</li>
+                  </ul>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-900 mb-2">💧 Water & Beverages</h4>
+                  <ul className="list-disc list-inside text-gray-700 space-y-1">
+                    <li>Bottled water (1 gallon/person/day)</li>
+                    <li>Water purification tablets</li>
+                    <li>Juice boxes</li>
+                    <li>Instant coffee/tea</li>
+                    <li>ORS packets</li>
+                  </ul>
+                </div>
+
+                <div className="bg-white border border-gray-200 rounded-lg p-4">
+                  <h4 className="font-bold text-gray-900 mb-2">🍪 Ready-to-Eat Items</h4>
+                  <ul className="list-disc list-inside text-gray-700 space-y-1">
+                    <li>Energy bars and protein bars</li>
+                    <li>Peanut butter</li>
+                    <li>Honey and jam</li>
+                    <li>Instant oatmeal</li>
+                    <li>Powdered milk</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 rounded">
+                <h3 className="font-bold text-yellow-900 mb-2">⚠️ Food Safety Tips:</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Store food in cool, dry place</li>
+                  <li>Rotate stock regularly (FIFO method)</li>
+                  <li>Keep at least 3-day supply per person</li>
+                  <li>Include manual can opener</li>
+                  <li>Check expiry dates monthly</li>
+                </ul>
+              </div>
+
+              <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
+                <h3 className="font-bold text-green-900 mb-2">📞 Food Assistance:</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Local Food Banks & NGOs</li>
+                  <li>Government Relief Centers</li>
+                  <li>Ration Distribution Centers</li>
+                  <li>Community Kitchens (Langar)</li>
+                  <li>Red Cross Food Services</li>
+                </ul>
+              </div>
+
+              <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+                <h3 className="font-bold text-blue-900 mb-2">🆘 Emergency Helplines:</h3>
+                <ul className="list-disc list-inside text-gray-700 space-y-1">
+                  <li>Disaster Management: 1078</li>
+                  <li>Women Helpline: 1091</li>
+                  <li>Child Helpline: 1098</li>
+                  <li>Senior Citizens: 14567</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }
