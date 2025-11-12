@@ -8,6 +8,8 @@ export interface Alert {
   _id: string;
   title: string;
   description: string;
+  type: string;
+  location: string;
   geometry: {
     type: string;
     coordinates: [number, number]; // [lng, lat]
@@ -19,6 +21,11 @@ export interface Alert {
   resolved?: boolean;
   resolvedAt?: string;
   resolvedBy?: string;
+  contactInfo?: {
+    name?: string;
+    phone?: string;
+    email?: string;
+  };
   createdAt: string;
 }
 

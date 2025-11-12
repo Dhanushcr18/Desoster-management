@@ -9,6 +9,7 @@ import { connectDB } from './config/database';
 import authRoutes from './routes/auth.routes';
 import alertRoutes from './routes/alert.routes';
 import reportRoutes from './routes/report.routes';
+import aiCallRoutes from './routes/ai-call.routes';
 import { initializeSocketIO } from './sockets/socket.handler';
 import { errorHandler } from './middleware/error.middleware';
 
@@ -50,6 +51,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/ai-call', aiCallRoutes);
 
 // Initialize Socket.IO handlers
 initializeSocketIO(io);
