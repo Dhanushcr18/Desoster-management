@@ -13,6 +13,10 @@ interface AlertDetailsModalProps {
 export default function AlertDetailsModal({ alert, onClose, onUpdateStatus }: AlertDetailsModalProps) {
   const [locationReports, setLocationReports] = useState<any[]>([]);
   const [loadingReports, setLoadingReports] = useState(false);
+  const [uploadingPhotos, setUploadingPhotos] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [localPhotos, setLocalPhotos] = useState<string[]>(alert.photos || []);
 
   useEffect(() => {
     // Only fetch location reports for database alerts (not real-world alerts)
@@ -38,6 +42,68 @@ export default function AlertDetailsModal({ alert, onClose, onUpdateStatus }: Al
       setLoadingReports(false);
     }
   };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadError('');
+    setUploadSuccess(false);
+
+    // Check if adding these photos would exceed the limit
+    if (localPhotos.length + files.length > 5) {
+      setUploadError(`Cannot upload more than 5 photos total. Currently have ${localPhotos.length} photo(s).`);
+      return;
+    }
+
+    setUploadingPhotos(true);
+
+    try {
+      const newPhotos: string[] = [];
+
+      // Convert files to base64
+      for (const file of Array.from(files)) {
+        if (file.size > 5 * 1024 * 1024) {
+          setUploadError(`Photo "${file.name}" is too large. Maximum size is 5MB.`);
+          setUploadingPhotos(false);
+          return;
+        }
+
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        newPhotos.push(base64);
+      }
+
+      // Upload photos to the alert
+      const token = localStorage.getItem('token');
+      const response = await axios.patch(
+        `http://localhost:3000/api/alerts/${alert._id}/photos`,
+        { photos: newPhotos },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      // Update local state with new photos
+      setLocalPhotos(response.data.alert.photos);
+      setUploadSuccess(true);
+      setTimeout(() => setUploadSuccess(false), 3000);
+
+      // Clear the input
+      e.target.value = '';
+    } catch (error: any) {
+      console.error('Failed to upload photos:', error);
+      setUploadError(error.response?.data?.message || 'Failed to upload photos. Please try again.');
+    } finally {
+      setUploadingPhotos(false);
+    }
+  };
+
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'high': return 'bg-red-500';
@@ -133,6 +199,183 @@ export default function AlertDetailsModal({ alert, onClose, onUpdateStatus }: Al
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* Photo Gallery */}
+          <div className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-xl p-5 border-2 border-pink-200">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center space-x-2">
+              <div className="bg-gradient-to-r from-pink-500 to-purple-500 p-2 rounded-lg">
+                <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <span>Disaster Photos</span>
+              {localPhotos.length > 0 && (
+                <span className="ml-auto bg-gradient-to-r from-pink-500 to-purple-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                  {localPhotos.length} {localPhotos.length === 1 ? 'Photo' : 'Photos'}
+                </span>
+              )}
+            </h3>
+
+{localPhotos.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-4">
+                {localPhotos.map((photo: string, index: number) => (
+                  <div
+                    key={index}
+                    className="relative group cursor-pointer overflow-hidden rounded-xl border-3 border-pink-300 hover:border-purple-500 shadow-md hover:shadow-2xl transition-all duration-300 transform hover:scale-105"
+                    onClick={() => {
+                      // Open full-size image in new tab
+                      const win = window.open('', '_blank');
+                      if (win) {
+                        win.document.write(`
+                          <html>
+                            <head>
+                              <title>Disaster Photo ${index + 1} - ${alert.title}</title>
+                              <style>
+                                body { 
+                                  margin: 0; 
+                                  display: flex; 
+                                  justify-content: center; 
+                                  align-items: center; 
+                                  min-height: 100vh; 
+                                  background: #000; 
+                                  padding: 20px;
+                                  box-sizing: border-box;
+                                }
+                                img { 
+                                  max-width: 100%; 
+                                  max-height: 100vh; 
+                                  object-fit: contain;
+                                  border-radius: 8px;
+                                  box-shadow: 0 10px 40px rgba(0,0,0,0.5);
+                                }
+                                .info {
+                                  position: fixed;
+                                  top: 20px;
+                                  left: 20px;
+                                  background: rgba(255,255,255,0.9);
+                                  padding: 15px 20px;
+                                  border-radius: 8px;
+                                  color: #333;
+                                  font-family: Arial, sans-serif;
+                                  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                                }
+                                .close-btn {
+                                  position: fixed;
+                                  top: 20px;
+                                  right: 20px;
+                                  background: rgba(255,255,255,0.9);
+                                  border: none;
+                                  width: 40px;
+                                  height: 40px;
+                                  border-radius: 50%;
+                                  cursor: pointer;
+                                  font-size: 24px;
+                                  display: flex;
+                                  align-items: center;
+                                  justify-content: center;
+                                  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+                                }
+                                .close-btn:hover {
+                                  background: rgba(255,255,255,1);
+                                }
+                              </style>
+                            </head>
+                            <body>
+                              <div class="info">
+                                <strong>📸 Photo ${index + 1} of ${localPhotos.length}</strong><br>
+                                <small>${alert.title}</small>
+                              </div>
+                              <button class="close-btn" onclick="window.close()">✕</button>
+                              <img src="${photo}" alt="Disaster Photo ${index + 1}" />
+                            </body>
+                          </html>
+                        `);
+                      }
+                    }}
+                  >
+                    <img
+                      src={photo}
+                      alt={`Disaster photo ${index + 1}`}
+                      className="w-full h-32 sm:h-40 object-cover"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300 flex flex-col items-center justify-center">
+                      <svg className="h-10 w-10 text-white mb-2 transform scale-0 group-hover:scale-100 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                      </svg>
+                      <span className="text-white font-bold text-sm">Click to View</span>
+                    </div>
+                    <div className="absolute top-2 right-2 bg-gradient-to-r from-pink-500 to-purple-500 text-white px-2 py-1 rounded-full text-xs font-bold shadow-lg">
+                      #{index + 1}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Upload Photos Section */}
+            {!alert.alertType && (
+              <div className="mt-4">
+                <label className="block cursor-pointer">
+                  <div className="bg-gradient-to-r from-pink-100 to-purple-100 border-2 border-dashed border-pink-400 hover:border-purple-500 rounded-xl p-4 text-center transition-all duration-300 hover:shadow-lg">
+                    <div className="flex flex-col items-center space-y-2">
+                      <svg className="h-10 w-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      <div>
+                        <p className="text-purple-700 font-bold text-sm">
+                          {uploadingPhotos ? 'Uploading...' : localPhotos.length > 0 ? 'Add More Photos' : 'Upload Photos to Help Others'}
+                        </p>
+                        <p className="text-xs text-purple-600 mt-1">
+                          {localPhotos.length < 5 ? `${5 - localPhotos.length} photo(s) remaining • Max 5MB each` : 'Maximum photos reached'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePhotoUpload}
+                    disabled={uploadingPhotos || localPhotos.length >= 5}
+                    className="hidden"
+                  />
+                </label>
+
+                {/* Success Message */}
+                {uploadSuccess && (
+                  <div className="mt-3 bg-green-100 border-2 border-green-500 rounded-lg p-3 flex items-center space-x-2">
+                    <svg className="h-5 w-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-green-700 font-medium text-sm">Photos uploaded successfully!</span>
+                  </div>
+                )}
+
+                {/* Error Message */}
+                {uploadError && (
+                  <div className="mt-3 bg-red-100 border-2 border-red-500 rounded-lg p-3 flex items-start space-x-2">
+                    <svg className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-red-700 font-medium text-sm">{uploadError}</span>
+                  </div>
+                )}
+
+                {/* Info Text */}
+                {localPhotos.length > 0 && (
+                  <div className="mt-3 bg-blue-50 rounded-lg p-3 text-center">
+                    <p className="text-sm text-blue-700 font-medium flex items-center justify-center space-x-2">
+                      <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                      <span>Click on any photo to view full size</span>
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Metadata */}

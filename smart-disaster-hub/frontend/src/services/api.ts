@@ -50,6 +50,7 @@ export const alertsAPI = {
     geometry: { coordinates: [number, number] };
     severity: string;
     source: string;
+    photos?: string[];
   }) => {
     const response = await api.post('/api/alerts', alertData);
     return response.data;

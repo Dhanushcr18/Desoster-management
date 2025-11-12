@@ -218,6 +218,11 @@ export default function Home() {
           </div>
           <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm">
             <p>&copy; 2025 DisasterAlert. All rights reserved.</p>
+            <p className="mt-2 text-xs text-gray-600">
+              <Link to="/admin/login" className="hover:text-gray-500 transition">
+                Administrator Access
+              </Link>
+            </p>
           </div>
         </div>
       </footer>

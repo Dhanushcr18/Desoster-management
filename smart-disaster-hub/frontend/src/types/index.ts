@@ -15,6 +15,10 @@ export interface Alert {
   severity: 'low' | 'medium' | 'high';
   source: string;
   verified: boolean;
+  photos?: string[]; // Array of base64 encoded photos
+  resolved?: boolean;
+  resolvedAt?: string;
+  resolvedBy?: string;
   createdAt: string;
 }
 

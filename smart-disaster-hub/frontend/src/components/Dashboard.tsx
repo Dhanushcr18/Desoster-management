@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import MapView from './MapView';
 import ReportModal from './ReportModal';
 import AlertDetailsModal from './AlertDetailsModal';
+import EmergencyContacts from './EmergencyContacts';
 import ToastContainer from './ToastContainer';
 import { alertsAPI } from '../services/api';
 import socketService from '../services/socket';
@@ -24,7 +25,8 @@ import {
   Clock,
   Menu,
   X,
-  Zap
+  Zap,
+  Phone
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -34,6 +36,7 @@ export default function Dashboard() {
   const [selectedAlert, setSelectedAlert] = useState<any | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showEmergencyContacts, setShowEmergencyContacts] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
@@ -367,6 +370,16 @@ export default function Dashboard() {
 
             {/* Right: User Info and Actions */}
             <div className="flex items-center space-x-4">
+              {/* Emergency Contacts Button */}
+              <button
+                onClick={() => setShowEmergencyContacts(true)}
+                className="flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-red-600 to-red-500 text-white rounded-lg hover:shadow-2xl hover:scale-105 transition-all duration-300 font-bold"
+                title="Emergency Contacts Worldwide"
+              >
+                <Phone className="h-5 w-5 animate-pulse" />
+                <span className="hidden lg:inline">SOS</span>
+              </button>
+
               {/* Notification Badge */}
               {newAlertCount > 0 && (
                 <div className="relative">
@@ -582,6 +595,13 @@ export default function Dashboard() {
           alert={selectedAlert}
           onClose={() => setShowDetailsModal(false)}
           onUpdateStatus={handleUpdateStatus}
+        />
+      )}
+
+      {/* Emergency Contacts Modal */}
+      {showEmergencyContacts && (
+        <EmergencyContacts
+          onClose={() => setShowEmergencyContacts(false)}
         />
       )}
 

@@ -10,6 +10,10 @@ export interface IAlert extends Document {
   severity: 'low' | 'medium' | 'high';
   source: string;
   verified: boolean;
+  photos?: string[]; // Array of base64 encoded photos
+  resolved?: boolean;
+  resolvedAt?: Date;
+  resolvedBy?: string;
   createdAt: Date;
 }
 
@@ -59,6 +63,26 @@ const AlertSchema = new Schema<IAlert>({
   verified: {
     type: Boolean,
     default: false
+  },
+  photos: {
+    type: [String],
+    default: [],
+    validate: {
+      validator: function(v: string[]) {
+        return v.length <= 5; // Maximum 5 photos
+      },
+      message: 'Cannot upload more than 5 photos'
+    }
+  },
+  resolved: {
+    type: Boolean,
+    default: false
+  },
+  resolvedAt: {
+    type: Date
+  },
+  resolvedBy: {
+    type: String
   },
   createdAt: {
     type: Date,

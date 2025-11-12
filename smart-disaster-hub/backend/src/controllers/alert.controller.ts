@@ -12,7 +12,8 @@ export const createAlertValidation = [
   body('geometry.coordinates[0]').isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude'),
   body('geometry.coordinates[1]').isFloat({ min: -90, max: 90 }).withMessage('Invalid latitude'),
   body('severity').isIn(['low', 'medium', 'high']).withMessage('Severity must be low, medium, or high'),
-  body('source').trim().notEmpty().withMessage('Source is required')
+  body('source').trim().notEmpty().withMessage('Source is required'),
+  body('photos').optional().isArray({ max: 5 }).withMessage('Maximum 5 photos allowed')
 ];
 
 export const getAlertsValidation = [
@@ -273,5 +274,82 @@ export const deleteAlert = async (req: AuthRequest, res: Response): Promise<void
   } catch (error) {
     console.error('Delete alert error:', error);
     res.status(500).json({ message: 'Failed to delete alert' });
+  }
+};
+
+// Validation for adding photos
+export const addPhotosValidation = [
+  body('photos').isArray({ min: 1, max: 5 }).withMessage('Photos must be an array with 1-5 items'),
+  body('photos.*').isString().withMessage('Each photo must be a base64 string')
+];
+
+// Add photos to existing alert
+export const addPhotosToAlert = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      res.status(400).json({ errors: errors.array() });
+      return;
+    }
+
+    const { id } = req.params;
+    const { photos } = req.body;
+
+    // Find the alert
+    const alert = await Alert.findById(id);
+    if (!alert) {
+      res.status(404).json({ message: 'Alert not found' });
+      return;
+    }
+
+    // Check if adding these photos would exceed the limit
+    const currentPhotoCount = alert.photos?.length || 0;
+    if (currentPhotoCount + photos.length > 5) {
+      res.status(400).json({ 
+        message: `Cannot add ${photos.length} photo(s). Alert already has ${currentPhotoCount} photo(s). Maximum is 5.` 
+      });
+      return;
+    }
+
+    // Add new photos to existing photos
+    const updatedPhotos = [...(alert.photos || []), ...photos];
+    alert.photos = updatedPhotos;
+    await alert.save();
+
+    res.json({
+      message: 'Photos added successfully',
+      alert: alert
+    });
+  } catch (error) {
+    console.error('Add photos error:', error);
+    res.status(500).json({ message: 'Failed to add photos' });
+  }
+};
+
+// Mark alert as resolved
+export const markAlertResolved = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const alert = await Alert.findById(id);
+
+    if (!alert) {
+      res.status(404).json({ message: 'Alert not found' });
+      return;
+    }
+
+    // Add resolved status
+    alert.resolved = true;
+    alert.resolvedAt = new Date();
+    alert.resolvedBy = req.userId;
+    await alert.save();
+
+    res.json({
+      message: 'Alert marked as resolved successfully',
+      alert: alert
+    });
+  } catch (error) {
+    console.error('Mark resolved error:', error);
+    res.status(500).json({ message: 'Failed to mark alert as resolved' });
   }
 };

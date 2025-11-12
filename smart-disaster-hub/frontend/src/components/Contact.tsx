@@ -19,6 +19,7 @@ export default function Contact() {
   const [error, setError] = useState('');
   const [geoLocation, setGeoLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [gettingLocation, setGettingLocation] = useState(false);
+  const [photos, setPhotos] = useState<string[]>([]);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -45,6 +46,33 @@ export default function Contact() {
         setGettingLocation(false);
       }
     );
+  };
+
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    if (files.length + photos.length > 5) {
+      setError('Maximum 5 photos allowed');
+      return;
+    }
+
+    Array.from(files).forEach(file => {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        setError('Each photo must be less than 5MB');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotos(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -95,7 +123,8 @@ export default function Contact() {
         description: formData.description || `Disaster reported by ${formData.name}. Contact: ${formData.phone || formData.email}`,
         geometry: { coordinates },
         severity: formData.severity as 'low' | 'medium' | 'high',
-        source: `Community Report - ${formData.name}`
+        source: `Community Report - ${formData.name}`,
+        photos: photos.length > 0 ? photos : undefined
       };
       
       console.log('Submitting alert:', alertData);
@@ -103,6 +132,7 @@ export default function Contact() {
 
       setSubmitted(true);
       setGeoLocation(null);
+      setPhotos([]);
       setFormData({
         name: '',
         email: '',
@@ -115,15 +145,19 @@ export default function Contact() {
     } catch (err: any) {
       console.error('Submit error:', err);
       console.error('Error response:', err.response);
+      console.error('Error request:', err.request);
+      console.error('Error message:', err.message);
       
-      // More detailed error messages
-      if (err.response?.data?.errors) {
+      // Check for network error
+      if (err.code === 'ERR_NETWORK' || !err.response) {
+        setError('Network Error: Cannot connect to server. Please check if the backend is running on http://localhost:3000');
+      } else if (err.response?.data?.errors) {
         const errorMessages = err.response.data.errors.map((e: any) => e.msg).join(', ');
         setError(`Validation error: ${errorMessages}`);
       } else if (err.response?.data?.message) {
         setError(err.response.data.message);
       } else if (err.message) {
-        setError(err.message);
+        setError(`Error: ${err.message}`);
       } else {
         setError('Failed to submit report. Please try again.');
       }
@@ -408,6 +442,57 @@ export default function Contact() {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                       placeholder="Please provide details about the disaster, injuries, and any immediate needs..."
                     />
+                  </div>
+
+                  {/* Photo Upload Section */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      📸 Upload Photos (Optional)
+                    </label>
+                    <div className="space-y-3">
+                      <label className="flex items-center justify-center w-full px-4 py-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-emerald-500 cursor-pointer transition bg-gray-50 hover:bg-emerald-50">
+                        <div className="text-center">
+                          <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                          <p className="mt-2 text-sm text-gray-600">
+                            <span className="font-semibold text-emerald-600">Click to upload</span> or drag photos
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 5MB (Max 5 photos)</p>
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handlePhotoUpload}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {/* Photo Preview */}
+                      {photos.length > 0 && (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                          {photos.map((photo, index) => (
+                            <div key={index} className="relative group">
+                              <img
+                                src={photo}
+                                alt={`Preview ${index + 1}`}
+                                className="w-full h-24 object-cover rounded-lg border-2 border-gray-200"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removePhoto(index)}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                              >
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {error && (

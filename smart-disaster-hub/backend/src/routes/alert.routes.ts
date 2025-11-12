@@ -6,7 +6,10 @@ import {
   deleteAlert,
   getAlertLocationReports,
   createAlertValidation,
-  getAlertsValidation
+  getAlertsValidation,
+  addPhotosToAlert,
+  addPhotosValidation,
+  markAlertResolved
 } from '../controllers/alert.controller';
 import { authenticate } from '../middleware/auth.middleware';
 
@@ -23,6 +26,12 @@ router.get('/:id/location-reports', authenticate, getAlertLocationReports);
 
 // POST /api/alerts - Create new alert (protected)
 router.post('/', authenticate, createAlertValidation, createAlert);
+
+// PATCH /api/alerts/:id/photos - Add photos to existing alert
+router.patch('/:id/photos', authenticate, addPhotosValidation, addPhotosToAlert);
+
+// PATCH /api/alerts/:id/resolve - Mark alert as resolved (admin function)
+router.patch('/:id/resolve', authenticate, markAlertResolved);
 
 // DELETE /api/alerts/:id - Delete alert (admin function)
 router.delete('/:id', authenticate, deleteAlert);
