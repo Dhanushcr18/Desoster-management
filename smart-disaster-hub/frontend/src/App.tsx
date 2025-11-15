@@ -8,6 +8,7 @@ import Login from './components/Login';
 import Register from './components/Register';
 import Home from './components/Home';
 import Contact from './components/Contact';
+import AIChat from './components/AIChat';
 
 function App() {
   const { user, loading } = useAuth();
@@ -50,6 +51,9 @@ function App() {
         />
         <Route path="/contact" element={<Contact />} />
       </Routes>
+      
+      {/* AI Chat Assistant - Available on all pages when user is logged in */}
+      {user && <AIChat />}
     </BrowserRouter>
   );
 }
