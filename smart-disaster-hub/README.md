@@ -6,6 +6,7 @@ A real-time disaster alert and coordination system that helps communities stay i
 
 Smart Disaster Hub is a full-stack application that provides:
 - **Real-time disaster alerts** with geographic mapping
+- **AI-powered chatbot** using Google Gemini for disaster assistance
 - **Community coordination** - mark yourself safe or request help
 - **Live updates** via WebSocket connections
 - **Mobile-responsive** dashboard with interactive map
@@ -26,6 +27,7 @@ Smart Disaster Hub is a full-stack application that provides:
 - **TypeScript** - Type-safe backend
 - **MongoDB** with Mongoose ODM
 - **Socket.IO** - WebSocket server
+- **Google Gemini AI** - Intelligent chatbot (optional)
 - **JWT** - Secure authentication
 - **bcrypt** - Password hashing
 - **express-validator** - Input validation
@@ -88,6 +90,14 @@ npm install
 cp .env.example .env
 # Edit .env with your settings
 ```
+
+**Optional: Enable Gemini AI Chatbot**
+```bash
+# Get your free API key from https://aistudio.google.com/apikey
+# Add to .env:
+GEMINI_API_KEY=your_api_key_here
+```
+See [GEMINI_SETUP.md](GEMINI_SETUP.md) for detailed AI integration guide.
 
 4. **Start MongoDB** (if not using Docker)
 ```bash

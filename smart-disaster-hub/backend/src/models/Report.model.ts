@@ -56,8 +56,11 @@ const ReportSchema = new Schema<IReport>({
     },
     coordinates: {
       type: [Number],
+      default: undefined,
       validate: {
         validator: function(v: number[]) {
+          // Allow undefined or null
+          if (!v) return true;
           return v.length === 2 && v[0] >= -180 && v[0] <= 180 && v[1] >= -90 && v[1] <= 90;
         },
         message: 'Invalid coordinates'
