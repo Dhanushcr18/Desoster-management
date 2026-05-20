@@ -1,7 +1,7 @@
 import { io, Socket } from 'socket.io-client';
 import type { Alert, ReportStats } from '../types';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 class SocketService {
   private socket: Socket | null = null;

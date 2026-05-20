@@ -81,13 +81,7 @@ export default function Contact() {
     setError('');
     
     try {
-      // Check if user is logged in
-      if (!user) {
-        setError('Please login to report a disaster');
-        setLoading(false);
-        setTimeout(() => navigate('/login'), 2000);
-        return;
-      }
+      // Note: login is no longer required - community reports are allowed without auth
 
       // Use geolocation if available, otherwise try to parse the location string
       let coordinates: [number, number];
@@ -145,12 +139,13 @@ export default function Contact() {
     } catch (err: any) {
       console.error('Submit error:', err);
       console.error('Error response:', err.response);
-      console.error('Error request:', err.request);
-      console.error('Error message:', err.message);
-      
+
       // Check for network error
       if (err.code === 'ERR_NETWORK' || !err.response) {
-        setError('Network Error: Cannot connect to server. Please check if the backend is running on http://localhost:3000');
+        setError('Network Error: Cannot connect to server. Please check if the backend is running on http://localhost:3001');
+      } else if (err.response?.status === 401) {
+        setError('Session expired. Please log in again to submit a report.');
+        setTimeout(() => navigate('/login'), 2500);
       } else if (err.response?.data?.errors) {
         const errorMessages = err.response.data.errors.map((e: any) => e.msg).join(', ');
         setError(`Validation error: ${errorMessages}`);

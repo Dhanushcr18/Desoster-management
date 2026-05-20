@@ -1,23 +1,25 @@
-import mongoose from 'mongoose';
+import { Sequelize } from 'sequelize';
+import path from 'path';
+
+// Use file-based SQLite for persistence
+const sequelize = new Sequelize({
+  dialect: 'sqlite',
+  storage: path.join(process.cwd(), 'disaster_hub.db'),
+  logging: process.env.NODE_ENV === 'development' ? console.log : false,
+});
 
 export const connectDB = async (): Promise<void> => {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/disaster-hub';
-    
-    await mongoose.connect(mongoUri);
-    
-    console.log('✅ MongoDB connected successfully');
-    
-    mongoose.connection.on('error', (err) => {
-      console.error('❌ MongoDB connection error:', err);
-    });
-    
-    mongoose.connection.on('disconnected', () => {
-      console.warn('⚠️ MongoDB disconnected');
-    });
-    
+    await sequelize.authenticate();
+    console.log('✅ SQLite Database connected successfully');
+
+    // Sync models with database - safe mode: only adds new tables/columns, never drops
+    await sequelize.sync();
+    console.log('✅ Database models synchronized');
   } catch (error) {
-    console.error('❌ MongoDB connection failed:', error);
+    console.error('❌ Database connection failed:', error);
     process.exit(1);
   }
 };
+
+export default sequelize;

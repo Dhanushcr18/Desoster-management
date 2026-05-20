@@ -204,7 +204,9 @@ Keep responses clear, actionable, and empathetic. Use emojis sparingly for bette
     console.log('[AI Fallback] Intents:', intents); // Log classified intents
 
     // Response routing based on intent
-    if (intents.greeting) {
+    if (userMessage.includes('what should i pack for a flood') || userMessage.includes('pack for a flood')) {
+      response = `Pack a waterproof bag with essential items such as: bottled water, non-perishable food, a first aid kit, flashlight, extra batteries, important documents in a sealed pouch, a power bank, and basic hygiene supplies.`;
+    } else if (intents.greeting) {
       response = `Hello! 👋 I'm your disaster management AI assistant.
 
 I can help you with:

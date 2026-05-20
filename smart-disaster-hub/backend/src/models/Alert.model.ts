@@ -1,97 +1,113 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import { DataTypes, Model } from 'sequelize';
+import sequelize from '../config/database';
 
-export interface IAlert extends Document {
+export interface IAlert {
+  id?: number;
   title: string;
   description: string;
-  geometry: {
-    type: string;
-    coordinates: [number, number]; // [longitude, latitude]
-  };
+  longitude: number;
+  latitude: number;
   severity: 'low' | 'medium' | 'high';
   source: string;
   verified: boolean;
-  photos?: string[]; // Array of base64 encoded photos
+  photos?: any; // JSON array
   resolved?: boolean;
   resolvedAt?: Date;
   resolvedBy?: string;
-  createdAt: Date;
+  createdAt?: Date;
 }
 
-const AlertSchema = new Schema<IAlert>({
-  title: {
-    type: String,
-    required: [true, 'Title is required'],
-    trim: true,
-    maxlength: [200, 'Title cannot exceed 200 characters']
-  },
-  description: {
-    type: String,
-    required: [true, 'Description is required'],
-    trim: true
-  },
-  geometry: {
-    type: {
-      type: String,
-      enum: ['Point'],
-      required: true,
-      default: 'Point'
+class Alert extends Model<IAlert> implements IAlert {
+  public id!: number;
+  public title!: string;
+  public description!: string;
+  public longitude!: number;
+  public latitude!: number;
+  public severity!: 'low' | 'medium' | 'high';
+  public source!: string;
+  public verified!: boolean;
+  public photos?: string;
+  public resolved!: boolean;
+  public resolvedAt?: Date;
+  public resolvedBy?: string;
+  public readonly createdAt!: Date;
+  public readonly updatedAt!: Date;
+}
+
+Alert.init(
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
     },
-    coordinates: {
-      type: [Number],
-      required: true,
+    title: {
+      type: DataTypes.STRING(200),
+      allowNull: false,
+    },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+    },
+    longitude: {
+      type: DataTypes.DECIMAL(11, 8),
+      allowNull: false,
       validate: {
-        validator: function(v: number[]) {
-          return v.length === 2 && 
-                 v[0] >= -180 && v[0] <= 180 && // longitude
-                 v[1] >= -90 && v[1] <= 90;     // latitude
-        },
-        message: 'Invalid coordinates. Format: [longitude, latitude]'
-      }
-    }
-  },
-  severity: {
-    type: String,
-    enum: ['low', 'medium', 'high'],
-    required: true,
-    default: 'medium'
-  },
-  source: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  verified: {
-    type: Boolean,
-    default: false
-  },
-  photos: {
-    type: [String],
-    default: [],
-    validate: {
-      validator: function(v: string[]) {
-        return v.length <= 5; // Maximum 5 photos
+        min: -180,
+        max: 180,
       },
-      message: 'Cannot upload more than 5 photos'
-    }
+    },
+    latitude: {
+      type: DataTypes.DECIMAL(10, 8),
+      allowNull: false,
+      validate: {
+        min: -90,
+        max: 90,
+      },
+    },
+    severity: {
+      type: DataTypes.ENUM('low', 'medium', 'high'),
+      allowNull: false,
+      defaultValue: 'medium',
+    },
+    source: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
+    verified: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    photos: {
+      type: DataTypes.JSON,
+      defaultValue: [],
+    },
+    resolved: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    resolvedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+    resolvedBy: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
   },
-  resolved: {
-    type: Boolean,
-    default: false
-  },
-  resolvedAt: {
-    type: Date
-  },
-  resolvedBy: {
-    type: String
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  {
+    sequelize,
+    tableName: 'alerts',
+    timestamps: true,
+    indexes: [
+      {
+        fields: ['severity', 'createdAt'],
+      },
+      {
+        fields: ['latitude', 'longitude'],
+      },
+    ],
   }
-});
+);
 
-// Geospatial index for location-based queries
-AlertSchema.index({ geometry: '2dsphere' });
-AlertSchema.index({ severity: 1, createdAt: -1 });
-
-export default mongoose.model<IAlert>('Alert', AlertSchema);
+export default Alert;

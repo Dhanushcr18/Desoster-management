@@ -1,38 +1,57 @@
-import mongoose, { Document, Schema } from 'mongoose';
+import { DataTypes, Model } from 'sequelize';
+import sequelize from '../config/database';
 
-export interface IUser extends Document {
+export interface IUser {
+  id?: number;
   email: string;
   password: string;
   name: string;
-  createdAt: Date;
+  createdAt?: Date;
 }
 
-const UserSchema = new Schema<IUser>({
-  email: {
-    type: String,
-    required: [true, 'Email is required'],
-    unique: true,
-    lowercase: true,
-    trim: true,
-    match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email']
+class User extends Model<IUser> implements IUser {
+  public id!: number;
+  public email!: string;
+  public password!: string;
+  public name!: string;
+  public readonly createdAt!: Date;
+  public readonly updatedAt!: Date;
+}
+
+User.init(
+  {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
+    },
+    email: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+      unique: true,
+      validate: {
+        isEmail: true,
+      },
+    },
+    password: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
+    name: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+    },
   },
-  password: {
-    type: String,
-    required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters']
-  },
-  name: {
-    type: String,
-    required: [true, 'Name is required'],
-    trim: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  {
+    sequelize,
+    tableName: 'users',
+    timestamps: true,
+    indexes: [
+      {
+        fields: ['email'],
+      },
+    ],
   }
-});
+);
 
-// Index for faster lookups
-UserSchema.index({ email: 1 });
-
-export default mongoose.model<IUser>('User', UserSchema);
+export default User;

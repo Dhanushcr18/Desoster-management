@@ -90,7 +90,17 @@ export default function Dashboard() {
   const loadAlerts = async () => {
     try {
       const data = await alertsAPI.getAll();
-      setAlerts(data.alerts || []);
+      // Normalize: backend uses numeric `id`, frontend Alert type uses `_id`
+      // Ensure both are always set so components can use either
+      const normalized = (data.alerts || []).map((a: any) => ({
+        ...a,
+        _id: a._id ?? String(a.id),   // always have _id as string
+        geometry: a.geometry ?? {
+          type: 'Point',
+          coordinates: [parseFloat(a.longitude), parseFloat(a.latitude)]
+        }
+      }));
+      setAlerts(normalized);
     } catch (error) {
       console.error('Failed to load alerts:', error);
     } finally {
@@ -98,20 +108,29 @@ export default function Dashboard() {
     }
   };
 
-  const loadRealWorldData = async () => {
+  const loadRealWorldData = async (forceRefresh = false) => {
     setLoadingRealData(true);
     try {
+      // Clear cache on forced refresh so we always get fresh data
+      if (forceRefresh) realWeatherService.clearCache();
+
       const realAlerts = await realWeatherService.getAllAlerts();
       const previousCount = realWorldAlerts.length;
       setRealWorldAlerts(realAlerts);
       
-      // Show notifications for new real-world alerts
-      if (previousCount > 0 && realAlerts.length > previousCount) {
+      if (forceRefresh) {
+        showToast({
+          id: `real-refresh-${Date.now()}`,
+          title: '🌍 Real-World Data Updated',
+          message: `${realAlerts.length} live disaster alerts loaded (NASA EONET + USGS + Weather)`,
+          type: 'info'
+        });
+      } else if (previousCount > 0 && realAlerts.length > previousCount) {
         const newAlerts = realAlerts.slice(0, realAlerts.length - previousCount);
-        newAlerts.forEach(alert => {
+        newAlerts.slice(0, 3).forEach(alert => {
           showToast({
             id: `real-${alert.id}`,
-            title: `🌍 Real-World Alert: ${alert.alertType.toUpperCase()}`,
+            title: `🌍 ${alert.alertType?.toUpperCase() || 'NEW'} Alert`,
             message: alert.title,
             type: alert.severity === 'high' ? 'error' : alert.severity === 'medium' ? 'warning' : 'info'
           });
@@ -120,7 +139,7 @@ export default function Dashboard() {
         playNotificationSound();
       }
 
-      console.log(`Loaded ${realAlerts.length} real-world alerts`);
+      console.log(`✅ Loaded ${realAlerts.length} real-world alerts`);
     } catch (error) {
       console.error('Failed to load real-world data:', error);
     } finally {
@@ -230,11 +249,22 @@ export default function Dashboard() {
   const handleAlertClick = async (alert: any) => {
     setSelectedAlert(alert);
     
-    // Try to load full details for database alerts
+    // Try to load full details for database alerts (they have numeric id, no alertType)
     if (!alert.alertType) {
       try {
-        const data = await alertsAPI.getById(alert._id);
-        setSelectedAlert(data.alert);
+        const data = await alertsAPI.getById(alert._id || String(alert.id));
+        const raw = data.alert;
+        // Normalize: ensure _id and geometry are always present
+        const normalized = {
+          ...raw,
+          _id: raw._id ?? String(raw.id),
+          geometry: raw.geometry ?? {
+            type: 'Point',
+            coordinates: [parseFloat(raw.longitude), parseFloat(raw.latitude)]
+          },
+          reportStats: data.reportStats ?? raw.reportStats ?? { safe: 0, help: 0 }
+        };
+        setSelectedAlert(normalized);
       } catch (error) {
         console.error('Failed to load alert details:', error);
       }
@@ -353,7 +383,7 @@ export default function Dashboard() {
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
       {/* Top Navigation Bar */}
-      <nav className="bg-white shadow-lg z-10">
+      <nav className="bg-white shadow-lg relative z-[1000]">
         <div className="px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Left: Logo and Title */}
@@ -436,14 +466,14 @@ export default function Dashboard() {
               
               {/* Real-World Data Refresh Button */}
               <button
-                onClick={loadRealWorldData}
+                onClick={() => loadRealWorldData(true)}
                 disabled={loadingRealData}
                 className="hidden md:flex items-center space-x-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-lg hover:shadow-lg transition disabled:opacity-50"
-                title="Fetch real-world disaster data"
+                title="Fetch live disasters: NASA EONET + USGS + Weather"
               >
                 <TrendingUp className={`h-4 w-4 ${loadingRealData ? 'animate-spin' : ''}`} />
                 <span className="font-medium">
-                  {loadingRealData ? 'Loading...' : `Real Data (${stats.realWorld})`}
+                  {loadingRealData ? 'Fetching...' : `Real Data (${stats.realWorld})`}
                 </span>
               </button>
               
@@ -470,7 +500,7 @@ export default function Dashboard() {
 
                 {/* Help Dropdown Menu */}
                 {showHelpMenu && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border-2 border-emerald-500/30 overflow-hidden z-50 animate-slide-down">
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-2xl border-2 border-emerald-500/30 overflow-hidden animate-slide-down" style={{ zIndex: 9999 }}>
                     <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3">
                       <h3 className="text-white font-bold text-lg">Emergency Resources</h3>
                       <p className="text-white/80 text-xs">Quick access to help</p>
@@ -720,7 +750,7 @@ export default function Dashboard() {
 
       {/* Help Modals */}
       {showHelpModal === 'shelter' && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowHelpModal(null)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style={{ zIndex: 9998 }} onClick={() => setShowHelpModal(null)}>
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="bg-gradient-to-r from-blue-500 to-cyan-500 p-6 text-white">
               <div className="flex items-center justify-between">
@@ -794,7 +824,7 @@ export default function Dashboard() {
       )}
 
       {showHelpModal === 'medications' && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowHelpModal(null)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style={{ zIndex: 9998 }} onClick={() => setShowHelpModal(null)}>
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="bg-gradient-to-r from-red-500 to-pink-500 p-6 text-white">
               <div className="flex items-center justify-between">
@@ -880,7 +910,7 @@ export default function Dashboard() {
       )}
 
       {showHelpModal === 'food' && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowHelpModal(null)}>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style={{ zIndex: 9998 }} onClick={() => setShowHelpModal(null)}>
           <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="bg-gradient-to-r from-orange-500 to-yellow-500 p-6 text-white">
               <div className="flex items-center justify-between">
@@ -987,7 +1017,7 @@ export default function Dashboard() {
       )}
 
       {/* Toast Container */}
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }

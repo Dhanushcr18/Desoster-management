@@ -11,24 +11,24 @@ import {
   addPhotosValidation,
   markAlertResolved
 } from '../controllers/alert.controller';
-import { authenticate } from '../middleware/auth.middleware';
+import { authenticate, optionalAuthenticate } from '../middleware/auth.middleware';
 
 const router = Router();
 
-// GET /api/alerts - Get all alerts (with optional filters)
-router.get('/', authenticate, getAlertsValidation, getAlerts);
+// GET /api/alerts - Get all alerts (public, optional auth)
+router.get('/', optionalAuthenticate, getAlertsValidation, getAlerts);
 
-// GET /api/alerts/:id - Get single alert by ID
-router.get('/:id', authenticate, getAlertById);
+// GET /api/alerts/:id - Get single alert by ID (public)
+router.get('/:id', optionalAuthenticate, getAlertById);
 
 // GET /api/alerts/:id/location-reports - Get location reports for an alert
-router.get('/:id/location-reports', authenticate, getAlertLocationReports);
+router.get('/:id/location-reports', optionalAuthenticate, getAlertLocationReports);
 
-// POST /api/alerts - Create new alert (protected)
-router.post('/', authenticate, createAlertValidation, createAlert);
+// POST /api/alerts - Create new alert (public with optional auth for community reports)
+router.post('/', optionalAuthenticate, createAlertValidation, createAlert);
 
-// PATCH /api/alerts/:id/photos - Add photos to existing alert
-router.patch('/:id/photos', authenticate, addPhotosValidation, addPhotosToAlert);
+// PATCH /api/alerts/:id/photos - Add photos to existing alert (optional auth)
+router.patch('/:id/photos', optionalAuthenticate, addPhotosValidation, addPhotosToAlert);
 
 // PATCH /api/alerts/:id/resolve - Mark alert as resolved (admin function)
 router.patch('/:id/resolve', authenticate, markAlertResolved);

@@ -1,5 +1,7 @@
 import { Response } from 'express';
 import { body, query, validationResult } from 'express-validator';
+import { Op } from 'sequelize';
+import sequelize from '../config/database';
 import Alert from '../models/Alert.model';
 import Report from '../models/Report.model';
 import { AuthRequest } from '../middleware/auth.middleware';
@@ -8,10 +10,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 export const createAlertValidation = [
   body('title').trim().notEmpty().withMessage('Title is required'),
   body('description').trim().notEmpty().withMessage('Description is required'),
-  body('geometry.coordinates').isArray({ min: 2, max: 2 }).withMessage('Coordinates must be [longitude, latitude]'),
-  body('geometry.coordinates[0]').isFloat({ min: -180, max: 180 }).withMessage('Invalid longitude'),
-  body('geometry.coordinates[1]').isFloat({ min: -90, max: 90 }).withMessage('Invalid latitude'),
-  body('severity').isIn(['low', 'medium', 'high']).withMessage('Severity must be low, medium, or high'),
+  body('severity').isIn(['low', 'medium', 'high', 'critical']).withMessage('Severity must be low, medium, high, or critical'),
   body('source').trim().notEmpty().withMessage('Source is required'),
   body('photos').optional().isArray({ max: 5 }).withMessage('Maximum 5 photos allowed')
 ];
@@ -32,81 +31,82 @@ export const getAlerts = async (req: AuthRequest, res: Response): Promise<void> 
 
     const { severity, bbox, limit = 50 } = req.query;
 
-    // Build query
-    const query: any = {};
+    // Build where clause
+    const where: any = {};
 
     if (severity) {
-      query.severity = severity;
+      where.severity = severity;
     }
 
     // Bounding box format: minLng,minLat,maxLng,maxLat
     if (bbox && typeof bbox === 'string') {
       const coords = bbox.split(',').map(Number);
       if (coords.length === 4) {
-        query.geometry = {
-          $geoWithin: {
-            $box: [
-              [coords[0], coords[1]], // bottom-left
-              [coords[2], coords[3]]  // top-right
-            ]
-          }
+        where.longitude = {
+          [Op.between]: [coords[0], coords[2]]
+        };
+        where.latitude = {
+          [Op.between]: [coords[1], coords[3]]
         };
       }
     }
 
-    const alerts = await Alert.find(query)
-      .sort({ createdAt: -1 })
-      .limit(Number(limit));
+    const alerts = await Alert.findAll({
+      where,
+      order: [['createdAt', 'DESC']],
+      limit: Number(limit)
+    });
 
     // Get report stats for each alert
     const alertsWithStats = await Promise.all(
       alerts.map(async (alert) => {
-        // Get aggregated report stats
-        const stats = await Report.aggregate([
-          { $match: { alertId: alert._id } },
-          {
-            $group: {
-              _id: '$status',
-              count: { $sum: 1 }
-            }
-          }
-        ]);
+        // Get status counts
+        const stats = await Report.findAll({
+          where: { alertId: alert.id },
+          attributes: [
+            'status',
+            [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+          ],
+          group: ['status'],
+          raw: true
+        });
 
-        // Calculate average safe radius
-        const radiusStats = await Report.aggregate([
-          { $match: { alertId: alert._id, safeRadius: { $exists: true, $ne: null } } },
-          {
-            $group: {
-              _id: null,
-              avgSafeRadius: { $avg: '$safeRadius' },
-              minSafeRadius: { $min: '$safeRadius' },
-              maxSafeRadius: { $max: '$safeRadius' },
-              count: { $sum: 1 }
-            }
-          }
-        ]);
+        // Get safe radius stats
+        const radiusStats = await Report.findAll({
+          where: { 
+            alertId: alert.id,
+            safeRadius: { [Op.ne]: null }
+          },
+          attributes: [
+            [sequelize.fn('AVG', sequelize.col('safeRadius')), 'avgSafeRadius'],
+            [sequelize.fn('MIN', sequelize.col('safeRadius')), 'minSafeRadius'],
+            [sequelize.fn('MAX', sequelize.col('safeRadius')), 'maxSafeRadius'],
+            [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+          ],
+          raw: true
+        });
 
         const reportStats: any = {
           safe: 0,
           help: 0
         };
 
-        stats.forEach((stat: any) => {
-          reportStats[stat._id as 'safe' | 'help'] = stat.count;
+        (stats as any).forEach((stat: any) => {
+          reportStats[stat.status as 'safe' | 'help'] = parseInt(stat.count, 10) || 0;
         });
 
         // Add safe radius information if available
-        if (radiusStats.length > 0) {
+        if (radiusStats.length > 0 && (radiusStats[0] as any).avgSafeRadius) {
           reportStats.safeRadius = {
-            average: Math.round(radiusStats[0].avgSafeRadius * 10) / 10,
-            min: radiusStats[0].minSafeRadius,
-            max: radiusStats[0].maxSafeRadius,
-            reportCount: radiusStats[0].count
+            average: Math.round((radiusStats[0] as any).avgSafeRadius * 10) / 10,
+            min: (radiusStats[0] as any).minSafeRadius,
+            max: (radiusStats[0] as any).maxSafeRadius,
+            reportCount: (radiusStats[0] as any).count
           };
         }
 
         return {
-          ...alert.toObject(),
+          ...alert.toJSON(),
           reportStats
         };
       })
@@ -127,53 +127,54 @@ export const getAlertById = async (req: AuthRequest, res: Response): Promise<voi
   try {
     const { id } = req.params;
 
-    const alert = await Alert.findById(id);
+    const alert = await Alert.findByPk(id);
     if (!alert) {
       res.status(404).json({ message: 'Alert not found' });
       return;
     }
 
-    // Get aggregated report stats
-    const stats = await Report.aggregate([
-      { $match: { alertId: alert._id } },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      }
-    ]);
+    // Get status counts
+    const stats = await Report.findAll({
+      where: { alertId: alert.id },
+      attributes: [
+        'status',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      group: ['status'],
+      raw: true
+    });
 
-    // Calculate average safe radius
-    const radiusStats = await Report.aggregate([
-      { $match: { alertId: alert._id, safeRadius: { $exists: true, $ne: null } } },
-      {
-        $group: {
-          _id: null,
-          avgSafeRadius: { $avg: '$safeRadius' },
-          minSafeRadius: { $min: '$safeRadius' },
-          maxSafeRadius: { $max: '$safeRadius' },
-          count: { $sum: 1 }
-        }
-      }
-    ]);
+    // Get safe radius stats
+    const radiusStats = await Report.findAll({
+      where: { 
+        alertId: alert.id,
+        safeRadius: { [Op.ne]: null }
+      },
+      attributes: [
+        [sequelize.fn('AVG', sequelize.col('safeRadius')), 'avgSafeRadius'],
+        [sequelize.fn('MIN', sequelize.col('safeRadius')), 'minSafeRadius'],
+        [sequelize.fn('MAX', sequelize.col('safeRadius')), 'maxSafeRadius'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      raw: true
+    });
 
     const reportStats: any = {
       safe: 0,
       help: 0
     };
 
-    stats.forEach((stat: any) => {
-      reportStats[stat._id as 'safe' | 'help'] = stat.count;
+    (stats as any).forEach((stat: any) => {
+      reportStats[stat.status as 'safe' | 'help'] = parseInt(stat.count, 10) || 0;
     });
 
     // Add safe radius information if available
-    if (radiusStats.length > 0) {
+    if (radiusStats.length > 0 && (radiusStats[0] as any).avgSafeRadius) {
       reportStats.safeRadius = {
-        average: Math.round(radiusStats[0].avgSafeRadius * 10) / 10,
-        min: radiusStats[0].minSafeRadius,
-        max: radiusStats[0].maxSafeRadius,
-        reportCount: radiusStats[0].count
+        average: Math.round((radiusStats[0] as any).avgSafeRadius * 10) / 10,
+        min: (radiusStats[0] as any).minSafeRadius,
+        max: (radiusStats[0] as any).maxSafeRadius,
+        reportCount: (radiusStats[0] as any).count
       };
     }
 
@@ -196,17 +197,35 @@ export const createAlert = async (req: AuthRequest, res: Response): Promise<void
       return;
     }
 
-    const { title, description, geometry, severity, source } = req.body;
+    const { title, description, severity, source, photos } = req.body;
+
+    // Support both geometry.coordinates format (frontend) and flat lat/lon format
+    let longitude: number;
+    let latitude: number;
+
+    if (req.body.geometry?.coordinates && Array.isArray(req.body.geometry.coordinates)) {
+      [longitude, latitude] = req.body.geometry.coordinates;
+    } else {
+      longitude = req.body.longitude;
+      latitude = req.body.latitude;
+    }
+
+    if (longitude === undefined || latitude === undefined || isNaN(longitude) || isNaN(latitude)) {
+      res.status(400).json({ message: 'Valid location coordinates are required' });
+      return;
+    }
+
+    // Normalize severity: 'critical' -> 'high' for DB compatibility
+    const normalizedSeverity = severity === 'critical' ? 'high' : severity;
 
     const alert = await Alert.create({
       title,
       description,
-      geometry: {
-        type: 'Point',
-        coordinates: geometry.coordinates
-      },
-      severity,
+      longitude,
+      latitude,
+      severity: normalizedSeverity,
       source,
+      photos: photos || [],
       verified: false
     });
 
@@ -232,21 +251,26 @@ export const getAlertLocationReports = async (req: AuthRequest, res: Response): 
     const { id } = req.params;
 
     // Get reports with location details
-    const reports = await Report.find({
-      alertId: id,
-      'locationDetails': { $exists: true }
-    })
-      .populate('userId', 'name email')
-      .sort({ createdAt: -1 })
-      .limit(50);
+    const reports = await Report.findAll({
+      where: { alertId: id },
+      include: [
+        {
+          association: 'User',
+          attributes: ['name', 'email']
+        }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: 50
+    });
 
-    // Filter reports that have meaningful location data
+    // Filter reports that have meaningful location or contact data
     const locationReports = reports.filter(report => 
-      report.locationDetails && (
-        report.locationDetails.address ||
-        report.locationDetails.affectedRoad ||
-        report.locationDetails.alternateRoute
-      )
+      report.address ||
+      report.affectedRoad ||
+      report.alternateRoute ||
+      report.contactName ||
+      report.contactPhone ||
+      report.contactLocation
     );
 
     res.json({
@@ -264,12 +288,13 @@ export const deleteAlert = async (req: AuthRequest, res: Response): Promise<void
   try {
     const { id } = req.params;
 
-    const alert = await Alert.findByIdAndDelete(id);
+    const alert = await Alert.findByPk(id);
     if (!alert) {
       res.status(404).json({ message: 'Alert not found' });
       return;
     }
 
+    await alert.destroy();
     res.json({ message: 'Alert deleted successfully' });
   } catch (error) {
     console.error('Delete alert error:', error);
@@ -296,14 +321,16 @@ export const addPhotosToAlert = async (req: AuthRequest, res: Response): Promise
     const { photos } = req.body;
 
     // Find the alert
-    const alert = await Alert.findById(id);
+    const alert = await Alert.findByPk(id);
     if (!alert) {
       res.status(404).json({ message: 'Alert not found' });
       return;
     }
 
-    // Check if adding these photos would exceed the limit
-    const currentPhotoCount = alert.photos?.length || 0;
+    // Get current photos
+    const currentPhotos = alert.photos || [];
+    const currentPhotoCount = Array.isArray(currentPhotos) ? currentPhotos.length : 0;
+    
     if (currentPhotoCount + photos.length > 5) {
       res.status(400).json({ 
         message: `Cannot add ${photos.length} photo(s). Alert already has ${currentPhotoCount} photo(s). Maximum is 5.` 
@@ -312,9 +339,8 @@ export const addPhotosToAlert = async (req: AuthRequest, res: Response): Promise
     }
 
     // Add new photos to existing photos
-    const updatedPhotos = [...(alert.photos || []), ...photos];
-    alert.photos = updatedPhotos;
-    await alert.save();
+    const updatedPhotos = [...(currentPhotos || []), ...photos];
+    await alert.update({ photos: updatedPhotos });
 
     res.json({
       message: 'Photos added successfully',
@@ -331,7 +357,7 @@ export const markAlertResolved = async (req: AuthRequest, res: Response): Promis
   try {
     const { id } = req.params;
 
-    const alert = await Alert.findById(id);
+    const alert = await Alert.findByPk(id);
 
     if (!alert) {
       res.status(404).json({ message: 'Alert not found' });

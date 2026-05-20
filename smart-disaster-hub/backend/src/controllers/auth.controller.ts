@@ -29,7 +29,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const { email, password, name } = req.body;
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ where: { email } });
     if (existingUser) {
       res.status(409).json({ message: 'User already exists' });
       return;
@@ -51,7 +51,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     const jwtExpires: string = process.env.JWT_EXPIRES_IN || '7d';
 
     const token = jwt.sign(
-      { userId: user._id.toString() },
+      { userId: user.id.toString() },
       jwtSecret,
       { expiresIn: jwtExpires } as SignOptions
     );
@@ -60,7 +60,7 @@ export const register = async (req: Request, res: Response): Promise<void> => {
       message: 'User registered successfully',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         name: user.name
       }
@@ -84,7 +84,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const { email, password } = req.body;
 
     // Find user
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ where: { email } });
     if (!user) {
       res.status(401).json({ message: 'Invalid credentials' });
       return;
@@ -102,7 +102,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     const jwtExpires: string = process.env.JWT_EXPIRES_IN || '7d';
 
     const token = jwt.sign(
-      { userId: user._id.toString() },
+      { userId: user.id.toString() },
       jwtSecret,
       { expiresIn: jwtExpires } as SignOptions
     );
@@ -111,7 +111,7 @@ export const login = async (req: Request, res: Response): Promise<void> => {
       message: 'Login successful',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         email: user.email,
         name: user.name
       }

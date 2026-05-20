@@ -1,7 +1,7 @@
 import axios from 'axios';
 import type { User, Alert, Report } from '../types';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -78,6 +78,9 @@ export const reportsAPI = {
       estimatedTime?: number;
       routeDescription?: string;
     };
+    contactName?: string;
+    contactPhone?: string;
+    contactLocation?: string;
   }) => {
     const response = await api.post('/api/reports', reportData);
     return response.data;

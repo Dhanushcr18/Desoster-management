@@ -83,7 +83,8 @@ export default function AIChat() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 left-6 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-lg transition-all duration-300 hover:scale-110 z-50 flex items-center gap-2"
+          className="fixed bottom-6 left-6 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-4 shadow-lg transition-all duration-300 hover:scale-110 flex items-center gap-2"
+          style={{ zIndex: 9998 }}
           aria-label="Open AI Chat Assistant"
         >
           <MessageCircle className="w-6 h-6" />
@@ -94,9 +95,10 @@ export default function AIChat() {
       {/* Chat Window */}
       {isOpen && (
         <div
-          className={`fixed left-6 bg-white dark:bg-gray-800 rounded-lg shadow-2xl z-50 flex flex-col transition-all duration-300 ${
+          className={`fixed left-6 bg-white dark:bg-gray-800 rounded-lg shadow-2xl flex flex-col transition-all duration-300 ${
             isMinimized ? 'bottom-6 w-80 h-14' : 'bottom-6 w-96 h-[500px]'
           }`}
+          style={{ zIndex: 9998 }}
         >
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 bg-blue-600 text-white rounded-t-lg">

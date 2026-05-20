@@ -1,460 +1,343 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { motion } from 'framer-motion';
 import AdminAlertCard from './AdminAlertCard';
-import AdminStats from './AdminStats';
-import { alertsAPI } from '../services/api';
-import socketService from '../services/socket';
 import type { AlertWithStats } from '../types';
-import { 
-  Shield, 
-  LogOut, 
+import {
+  Shield,
   Search,
-  Filter,
   RefreshCw,
-  TrendingUp,
   AlertTriangle,
-  Users,
-  MapPin,
-  Phone,
-  Bell,
-  Activity,
-  X
+  LogOut,
+  CheckCircle,
+  Clock,
+  Users
 } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+// Transform backend flat {longitude, latitude} format into the {geometry.coordinates} shape
+// that AlertWithStats / AdminAlertCard expect.
+function normalizeAlert(raw: any): AlertWithStats {
+  const longitude = parseFloat(raw.longitude ?? raw.geometry?.coordinates?.[0] ?? 0);
+  const latitude  = parseFloat(raw.latitude  ?? raw.geometry?.coordinates?.[1] ?? 0);
+
+  return {
+    // Support both numeric `id` (SQLite) and string `_id` (Mongo-style)
+    _id:          String(raw._id ?? raw.id),
+    title:        raw.title,
+    description:  raw.description,
+    severity:     raw.severity as 'low' | 'medium' | 'high',
+    source:       raw.source,
+    verified:     raw.verified ?? false,
+    photos:       Array.isArray(raw.photos) ? raw.photos : [],
+    resolved:     raw.resolved ?? false,
+    resolvedAt:   raw.resolvedAt,
+    resolvedBy:   raw.resolvedBy,
+    createdAt:    raw.createdAt,
+    geometry: {
+      type: 'Point',
+      coordinates: [longitude, latitude]
+    },
+    reportStats: raw.reportStats ?? { safe: 0, help: 0 }
+  };
+}
+
 export default function AdminDashboard() {
-  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [alerts, setAlerts] = useState<AlertWithStats[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
-  const [activeFilter, setActiveFilter] = useState<string>('all');
-  const [refreshing, setRefreshing] = useState(false);
-  const [showEmergencyPanel, setShowEmergencyPanel] = useState(false);
-  const [stats, setStats] = useState({
-    total: 0,
-    high: 0,
-    medium: 0,
-    low: 0,
-    withPhotos: 0,
-    needsHelp: 0
-  });
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  useEffect(() => {
-    // Check if user is admin (you can add role check here)
-    loadAlerts();
-    setupSocketListeners();
+  const getToken = () =>
+    localStorage.getItem('token') || localStorage.getItem('adminToken') || '';
 
-    return () => {
-      socketService.offNewAlert();
-      socketService.offReportUpdate();
-    };
-  }, []);
-
-  const loadAlerts = async () => {
+  const loadAlerts = useCallback(async () => {
     try {
-      setLoading(true);
-      const data = await alertsAPI.getAll();
-      const alertsList = data.alerts || [];
-      setAlerts(alertsList);
-      calculateStats(alertsList);
-    } catch (error) {
-      console.error('Failed to load alerts:', error);
+      setError('');
+      const token = getToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(`${API_URL}/api/alerts?limit=100`, { headers });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const rawAlerts: any[] = data.alerts || data || [];
+      setAlerts(rawAlerts.map(normalizeAlert));
+      setLastUpdated(new Date());
+    } catch (err: any) {
+      console.error('Failed to load alerts:', err);
+      setError(err.message || 'Failed to load alerts from server');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const calculateStats = (alertsList: AlertWithStats[]) => {
-    const stats = {
-      total: alertsList.length,
-      high: alertsList.filter(a => a.severity === 'high').length,
-      medium: alertsList.filter(a => a.severity === 'medium').length,
-      low: alertsList.filter(a => a.severity === 'low').length,
-      withPhotos: alertsList.filter(a => a.photos && a.photos.length > 0).length,
-      needsHelp: alertsList.reduce((sum, a) => sum + (a.reportStats?.help || 0), 0)
-    };
-    setStats(stats);
-  };
+  // Load on mount and auto-refresh every 30 s
+  useEffect(() => {
+    loadAlerts();
+    const interval = setInterval(loadAlerts, 30_000);
+    return () => clearInterval(interval);
+  }, [loadAlerts]);
 
-  const setupSocketListeners = () => {
-    socketService.joinAlertsRoom();
-
-    socketService.onNewAlert((alert) => {
-      setAlerts((prev) => [alert, ...prev]);
-      calculateStats([alert, ...alerts]);
-    });
-
-    socketService.onReportUpdate((data) => {
-      setAlerts((prev) =>
-        prev.map((alert) =>
-          alert._id === data.alertId
-            ? { ...alert, reportStats: data.reportStats }
-            : alert
-        )
-      );
-    });
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadAlerts();
-    setTimeout(() => setRefreshing(false), 1000);
+  const handleRefresh = () => {
+    setLoading(true);
+    loadAlerts();
   };
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/');
   };
 
-  const handleFilterChange = (filter: 'all' | 'high' | 'medium' | 'low' | 'photos' | 'help') => {
-    setActiveFilter(filter);
-    
-    // Update severity filter
-    if (filter === 'all') {
-      setFilterSeverity('all');
-    } else if (['high', 'medium', 'low'].includes(filter)) {
-      setFilterSeverity(filter);
-    } else {
-      setFilterSeverity('all');
-    }
-    
-    // Scroll to alerts section
-    const alertsSection = document.getElementById('alerts-section');
-    if (alertsSection) {
-      alertsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+  const handleResolve = () => {
+    // Reload after resolving so stats update
+    loadAlerts();
   };
 
   const filteredAlerts = alerts
     .filter(alert => {
-      const matchesSearch = alert.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           alert.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const q = searchQuery.toLowerCase();
+      const matchesSearch =
+        alert.title.toLowerCase().includes(q) ||
+        alert.description.toLowerCase().includes(q) ||
+        alert.source.toLowerCase().includes(q);
       const matchesSeverity = filterSeverity === 'all' || alert.severity === filterSeverity;
-      
-      // Additional filters
-      let matchesFilter = true;
-      if (activeFilter === 'photos') {
-        matchesFilter = alert.photos && alert.photos.length > 0;
-      } else if (activeFilter === 'help') {
-        matchesFilter = (alert.reportStats?.help || 0) > 0;
-      }
-      
-      return matchesSearch && matchesSeverity && matchesFilter;
+      return matchesSearch && matchesSeverity;
     })
     .sort((a, b) => {
-      // Sort by severity first, then by date
-      const severityOrder = { high: 0, medium: 1, low: 2 };
-      if (a.severity !== b.severity) {
-        return severityOrder[a.severity] - severityOrder[b.severity];
-      }
+      const order: Record<string, number> = { high: 0, medium: 1, low: 2 };
+      if (a.severity !== b.severity) return (order[a.severity] ?? 3) - (order[b.severity] ?? 3);
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
 
+  const stats = {
+    high:   alerts.filter(a => a.severity === 'high').length,
+    medium: alerts.filter(a => a.severity === 'medium').length,
+    low:    alerts.filter(a => a.severity === 'low').length,
+    total:  alerts.length,
+    resolved:   alerts.filter(a => a.resolved).length,
+    unresolved: alerts.filter(a => !a.resolved).length,
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
-      {/* Animated Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-pink-500/10 rounded-full blur-3xl animate-pulse animation-delay-2000"></div>
-        <div className="absolute top-1/2 left-1/2 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse animation-delay-4000"></div>
+    <div className="min-h-screen bg-[#0f111a] text-gray-100 overflow-x-hidden font-sans">
+      {/* ── Background Elements ── */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-purple-600/10 blur-[120px]"></div>
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-blue-600/10 blur-[120px]"></div>
       </div>
 
-      {/* Header */}
-      <header className="bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 shadow-2xl sticky top-0 z-50 border-b-4 border-white/10">
+      {/* ── Header ── */}
+      <header className="bg-slate-900/60 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
           <div className="flex items-center justify-between">
-            {/* Logo */}
             <div className="flex items-center space-x-4">
-              <div className="relative">
-                <div className="absolute inset-0 bg-white/30 rounded-2xl blur-xl"></div>
-                <div className="relative bg-gradient-to-br from-white/30 to-white/10 backdrop-blur-sm p-4 rounded-2xl shadow-2xl border border-white/20">
-                  <Shield className="h-8 w-8 text-white drop-shadow-lg" />
-                </div>
+              <div className="p-3 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl shadow-[0_0_20px_rgba(139,92,246,0.3)]">
+                <Shield className="h-8 w-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-black text-white drop-shadow-lg tracking-tight">
+                <h1 className="text-2xl sm:text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400 tracking-tight">
                   ADMIN CONTROL
                 </h1>
-                <p className="text-sm text-white/90 font-semibold">Emergency Response Command Center</p>
+                <p className="text-sm text-gray-400 font-medium">
+                  Disaster Hub
+                  {lastUpdated && (
+                    <span className="ml-2 text-gray-500">
+                      • Updated {lastUpdated.toLocaleTimeString()}
+                    </span>
+                  )}
+                </p>
               </div>
             </div>
 
-            {/* Quick Actions */}
             <div className="flex items-center space-x-3">
-              {/* User Dashboard Link */}
               <button
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center space-x-2 px-5 py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-600 hover:to-cyan-600 text-white rounded-xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-white/20"
-                title="Switch to User Dashboard"
+                onClick={handleRefresh}
+                disabled={loading}
+                className="flex items-center space-x-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg transition-all duration-300 disabled:opacity-50"
               >
-                <MapPin className="h-5 w-5" />
-                <span className="hidden lg:inline">User Dashboard</span>
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{loading ? 'Syncing...' : 'Refresh'}</span>
               </button>
-
-              {/* Emergency Numbers Button */}
-              <button
-                onClick={() => setShowEmergencyPanel(!showEmergencyPanel)}
-                className="flex items-center space-x-2 px-5 py-3 bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white rounded-xl font-bold shadow-xl hover:shadow-2xl transition-all duration-300 transform hover:scale-105 border border-white/20"
-              >
-                <Phone className="h-5 w-5 animate-pulse" />
-                <span className="hidden lg:inline">Emergency Hotline</span>
-              </button>
-
-              {/* User Info */}
-              <div className="hidden md:flex items-center space-x-3 px-4 py-2 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
-                <div className="text-right">
-                  <p className="text-sm font-bold text-white">{user?.name}</p>
-                  <p className="text-xs text-white/70">Administrator</p>
-                </div>
-              </div>
-
               <button
                 onClick={handleLogout}
-                className="flex items-center space-x-2 px-4 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl transition backdrop-blur-sm border border-white/20"
+                className="flex items-center space-x-2 px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 rounded-lg transition-all duration-300"
               >
-                <LogOut className="h-5 w-5" />
-                <span className="hidden sm:inline font-semibold">Logout</span>
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Logout</span>
               </button>
             </div>
           </div>
         </div>
       </header>
 
-      {/* Emergency Numbers Panel */}
-      {showEmergencyPanel && (
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="bg-gradient-to-br from-red-500/20 to-orange-500/20 backdrop-blur-xl rounded-2xl p-6 border-2 border-red-500/50 shadow-2xl animate-slide-down">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-3">
-                <div className="bg-red-500 p-3 rounded-xl">
-                  <Phone className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-bold text-white">Global Emergency Hotlines</h3>
-                  <p className="text-sm text-white/80">Click any number to call immediately</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowEmergencyPanel(false)}
-                className="p-2 hover:bg-white/10 rounded-lg transition"
-              >
-                <X className="h-6 w-6 text-white" />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* India */}
-              <div className="bg-gradient-to-br from-orange-600 to-red-600 rounded-xl p-4 transform hover:scale-105 transition-all duration-300 shadow-lg">
-                <div className="text-4xl mb-3">🇮🇳</div>
-                <h4 className="text-white font-bold mb-3">India</h4>
-                <div className="space-y-2">
-                  <a href="tel:100" className="block bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 text-center font-bold transition">
-                    🚓 Police: 100
-                  </a>
-                  <a href="tel:101" className="block bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 text-center font-bold transition">
-                    🚒 Fire: 101
-                  </a>
-                  <a href="tel:102" className="block bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 text-center font-bold transition">
-                    🚑 Ambulance: 102
-                  </a>
-                  <a href="tel:1078" className="block bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 text-center font-bold transition">
-                    ⚠️ Disaster: 1078
-                  </a>
-                </div>
-              </div>
-
-              {/* USA */}
-              <div className="bg-gradient-to-br from-blue-600 to-red-600 rounded-xl p-4 transform hover:scale-105 transition-all duration-300 shadow-lg">
-                <div className="text-4xl mb-3">🇺🇸</div>
-                <h4 className="text-white font-bold mb-3">United States</h4>
-                <div className="space-y-2">
-                  <a href="tel:911" className="block bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 text-center font-bold transition">
-                    🚨 All Emergency: 911
-                  </a>
-                  <a href="tel:1-800-621-3362" className="block bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 text-center font-bold text-sm transition">
-                    ⚠️ FEMA: 1-800-621-3362
-                  </a>
-                  <a href="mailto:fema@dhs.gov" className="block bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 text-center font-bold text-xs transition">
-                    📧 fema@dhs.gov
-                  </a>
-                </div>
-              </div>
-
-              {/* UK */}
-              <div className="bg-gradient-to-br from-blue-700 to-red-600 rounded-xl p-4 transform hover:scale-105 transition-all duration-300 shadow-lg">
-                <div className="text-4xl mb-3">🇬🇧</div>
-                <h4 className="text-white font-bold mb-3">United Kingdom</h4>
-                <div className="space-y-2">
-                  <a href="tel:999" className="block bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 text-center font-bold transition">
-                    🚨 All Emergency: 999
-                  </a>
-                  <a href="tel:112" className="block bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 text-center font-bold transition">
-                    🆘 EU Emergency: 112
-                  </a>
-                  <a href="tel:0800-107-0059" className="block bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 text-center font-bold text-sm transition">
-                    ⚠️ Disaster: 0800-107-0059
-                  </a>
-                </div>
-              </div>
-
-              {/* International */}
-              <div className="bg-gradient-to-br from-green-600 to-blue-600 rounded-xl p-4 transform hover:scale-105 transition-all duration-300 shadow-lg">
-                <div className="text-4xl mb-3">🌍</div>
-                <h4 className="text-white font-bold mb-3">International</h4>
-                <div className="space-y-2">
-                  <a href="tel:112" className="block bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 text-center font-bold transition">
-                    🆘 EU Emergency: 112
-                  </a>
-                  <button className="w-full bg-white/20 hover:bg-white/30 text-white rounded-lg p-2 text-center font-bold transition">
-                    🌐 More Countries
-                  </button>
-                  <p className="text-xs text-white/80 text-center mt-2">
-                    Click for complete emergency contact list
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <AdminStats stats={stats} onFilterChange={handleFilterChange} activeFilter={activeFilter} />
-
-        {/* Controls */}
-        <div className="relative bg-gradient-to-br from-purple-500/10 to-pink-500/10 backdrop-blur-xl rounded-3xl shadow-2xl p-6 mb-6 border-2 border-purple-500/30">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1">
-              <div className="relative group">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-purple-400 group-focus-within:text-pink-400 transition-colors" />
-                <input
-                  type="text"
-                  placeholder="🔍 Search disasters by title or description..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-4 bg-slate-900/70 border-2 border-purple-500/30 rounded-2xl text-white placeholder-gray-400 focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all duration-300 font-medium"
-                />
-              </div>
-            </div>
-
-            {/* Filter */}
-            <div className="flex items-center space-x-3">
-              <div className="bg-purple-500/20 p-3 rounded-xl">
-                <Filter className="h-5 w-5 text-purple-300" />
-              </div>
-              <select
-                value={filterSeverity}
-                onChange={(e) => setFilterSeverity(e.target.value)}
-                className="px-5 py-4 bg-slate-900/70 border-2 border-purple-500/30 rounded-2xl text-white font-semibold focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all duration-300 cursor-pointer"
-              >
-                <option value="all">🎯 All Severities</option>
-                <option value="high">🔴 High Priority</option>
-                <option value="medium">🟡 Medium Priority</option>
-                <option value="low">🔵 Low Priority</option>
-              </select>
-            </div>
-
-            {/* Refresh */}
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="flex items-center space-x-2 px-6 py-4 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 disabled:opacity-50 transform hover:scale-105 font-bold"
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+        {/* ── Stats ── */}
+        <motion.div 
+          className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, staggerChildren: 0.1 }}
+        >
+          {[
+            { label: 'High Priority',   value: stats.high,       bg: 'bg-red-500/10', border: 'border-red-500/20', text: 'text-red-400' },
+            { label: 'Medium Priority', value: stats.medium,     bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400' },
+            { label: 'Low Priority',    value: stats.low,        bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-400' },
+            { label: 'Total Alerts',    value: stats.total,      bg: 'bg-violet-500/10', border: 'border-violet-500/20', text: 'text-violet-400' },
+            { label: 'Resolved',        value: stats.resolved,   bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', text: 'text-emerald-400' },
+            { label: 'Active',          value: stats.unresolved, bg: 'bg-orange-500/10', border: 'border-orange-500/20', text: 'text-orange-400' },
+          ].map((s, i) => (
+            <motion.div 
+              key={s.label} 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className={`relative overflow-hidden rounded-2xl p-5 border ${s.border} ${s.bg} backdrop-blur-sm transition-transform duration-300 hover:scale-[1.02]`}
             >
-              <RefreshCw className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
-            </button>
-          </div>
-        </div>
+              <div className="relative z-10">
+                <p className={`${s.text} text-xs font-bold uppercase tracking-wider mb-1`}>{s.label}</p>
+                <p className="text-3xl font-black text-white tracking-tight">{s.value}</p>
+              </div>
+              <div className={`absolute -bottom-4 -right-4 w-16 h-16 rounded-full ${s.bg} blur-xl`}></div>
+            </motion.div>
+          ))}
+        </motion.div>
 
-        {/* Alerts Grid */}
-        <div id="alerts-section">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="relative">
-                <div className="absolute inset-0 bg-purple-500/20 rounded-full blur-2xl animate-pulse"></div>
-                <Activity className="relative h-20 w-20 text-purple-400 mx-auto mb-6 animate-spin" />
-              </div>
-              <p className="text-white text-xl font-bold mb-2">Loading Control Center...</p>
-              <p className="text-purple-300 text-sm">Fetching disaster reports</p>
+        {/* ── Error Banner ── */}
+        {error && (
+          <div className="mb-6 bg-red-500/20 border border-red-500 text-red-300 px-4 py-3 rounded-xl flex items-center space-x-3">
+            <AlertTriangle className="h-5 w-5 flex-shrink-0" />
+            <div>
+              <p className="font-semibold">Failed to load live data</p>
+              <p className="text-sm">{error}</p>
             </div>
-          </div>
-        ) : filteredAlerts.length === 0 ? (
-          <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 backdrop-blur-xl rounded-3xl shadow-2xl p-16 text-center border-2 border-purple-500/30">
-            <div className="relative inline-block mb-6">
-              <div className="absolute inset-0 bg-purple-500/20 rounded-full blur-2xl"></div>
-              <AlertTriangle className="relative h-24 w-24 text-purple-400 mx-auto animate-pulse" />
-            </div>
-            <h3 className="text-3xl font-black text-white mb-3">No Disasters Found</h3>
-            <p className="text-purple-200 text-lg mb-8">
-              {searchQuery || filterSeverity !== 'all'
-                ? '🔍 Try adjusting your search or filter criteria'
-                : '✅ No disaster reports have been submitted yet'}
-            </p>
-            
-            {/* Link to User App */}
-            {!searchQuery && filterSeverity === 'all' && (
-              <div className="mt-8 space-y-4">
-                <div className="w-full h-px bg-gradient-to-r from-transparent via-purple-500/50 to-transparent mb-6"></div>
-                <p className="text-purple-300 text-sm mb-4">Want to report a disaster?</p>
-                <button
-                  onClick={() => navigate('/dashboard')}
-                  className="inline-flex items-center space-x-3 px-8 py-4 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white rounded-2xl font-bold text-lg shadow-2xl hover:shadow-emerald-500/50 transform hover:scale-105 transition-all duration-300 border-2 border-emerald-500/50"
-                >
-                  <MapPin className="h-6 w-6" />
-                  <span>Go to User Dashboard</span>
-                  <span className="text-2xl">→</span>
-                </button>
-                <p className="text-purple-400 text-xs mt-4">Switch to user interface to report new disasters</p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 px-2 gap-4">
-              <div className="flex items-center space-x-3">
-                <h2 className="text-3xl font-black text-white flex items-center space-x-3">
-                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-3 rounded-xl">
-                    <AlertTriangle className="h-8 w-8 text-white" />
-                  </div>
-                  <span>Active Disasters</span>
-                </h2>
-                {activeFilter !== 'all' && (
-                  <button
-                    onClick={() => handleFilterChange('all')}
-                    className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500 rounded-lg text-red-300 hover:text-red-200 text-sm font-semibold transition-all duration-300 flex items-center space-x-2"
-                  >
-                    <X className="h-4 w-4" />
-                    <span>Clear Filter</span>
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                {activeFilter !== 'all' && (
-                  <div className="px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-xl border border-purple-400 animate-pulse">
-                    <p className="text-sm text-white font-bold">
-                      🎯 Filter: {activeFilter.toUpperCase()}
-                    </p>
-                  </div>
-                )}
-                <div className="px-4 py-2 bg-purple-500/20 backdrop-blur-sm rounded-xl border border-purple-500/30">
-                  <p className="text-sm text-purple-200 font-semibold">
-                    📊 {filteredAlerts.length} / {alerts.length} reports
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            {filteredAlerts.map((alert) => (
-              <AdminAlertCard key={alert._id} alert={alert} onResolve={loadAlerts} />
-            ))}
           </div>
         )}
-        </div>
+
+        {/* ── Search & Filter ── */}
+        <motion.div 
+          className="bg-gray-800/40 backdrop-blur-md rounded-2xl p-5 mb-8 border border-white/5 shadow-lg"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1 relative group">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-500 group-focus-within:text-violet-400 transition-colors" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search alerts by title, description, or source…"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-gray-900/50 border border-gray-700/50 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all"
+              />
+            </div>
+            <select
+              value={filterSeverity}
+              onChange={e => setFilterSeverity(e.target.value)}
+              className="px-4 py-3 bg-gray-900/50 border border-gray-700/50 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all appearance-none cursor-pointer min-w-[200px]"
+            >
+              <option value="all">⚡ All Severities</option>
+              <option value="high">🔴 High Only</option>
+              <option value="medium">🟡 Medium Only</option>
+              <option value="low">🔵 Low Only</option>
+            </select>
+          </div>
+
+          {/* Summary row */}
+          <div className="mt-4 flex flex-wrap gap-4 text-xs font-medium text-gray-400">
+            <span className="flex items-center space-x-1.5 px-3 py-1 bg-white/5 rounded-full border border-white/5">
+              <AlertTriangle className="h-3.5 w-3.5 text-violet-400" />
+              <span>Showing <strong className="text-white">{filteredAlerts.length}</strong> of {stats.total} alerts</span>
+            </span>
+            {stats.resolved > 0 && (
+              <span className="flex items-center space-x-1.5 px-3 py-1 bg-white/5 rounded-full border border-white/5">
+                <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                <span><strong className="text-emerald-400">{stats.resolved}</strong> resolved</span>
+              </span>
+            )}
+            <span className="flex items-center space-x-1.5 px-3 py-1 bg-white/5 rounded-full border border-white/5">
+              <Clock className="h-3.5 w-3.5 text-blue-400" />
+              <span>Auto-refreshes every 30s</span>
+            </span>
+            <span className="flex items-center space-x-1.5 px-3 py-1 bg-white/5 rounded-full border border-white/5">
+              <Users className="h-3.5 w-3.5 text-amber-400" />
+              <span>Community reports included</span>
+            </span>
+          </div>
+        </motion.div>
+
+        {/* ── Alerts List ── */}
+        {loading && alerts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-24">
+            <div className="relative w-16 h-16 mb-6">
+              <div className="absolute inset-0 border-4 border-violet-500/20 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-violet-500 rounded-full border-t-transparent animate-spin"></div>
+            </div>
+            <p className="text-white text-xl font-bold tracking-tight">Initializing Dashboard</p>
+            <p className="text-gray-400 mt-2 font-medium">Establishing secure connection to core systems...</p>
+          </div>
+        ) : filteredAlerts.length === 0 ? (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center py-24 bg-gray-800/30 rounded-3xl border border-white/5 backdrop-blur-sm"
+          >
+            <div className="w-20 h-20 bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="h-10 w-10 text-gray-500" />
+            </div>
+            <p className="text-white text-2xl font-bold tracking-tight mb-2">
+              {alerts.length === 0 ? 'Systems Nominal' : 'No matches found'}
+            </p>
+            <p className="text-gray-400">
+              {alerts.length === 0
+                ? 'No active alerts detected in the monitoring region.'
+                : 'Try adjusting your search parameters or filter settings.'}
+            </p>
+          </motion.div>
+        ) : (
+          <motion.div 
+            className="space-y-6"
+            initial="hidden"
+            animate="show"
+            variants={{
+              hidden: { opacity: 0 },
+              show: {
+                opacity: 1,
+                transition: { staggerChildren: 0.1 }
+              }
+            }}
+          >
+            {filteredAlerts.map(alert => (
+              <motion.div
+                key={alert._id}
+                variants={{
+                  hidden: { opacity: 0, y: 20 },
+                  show: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 300, damping: 24 } }
+                }}
+              >
+                <AdminAlertCard
+                  alert={alert}
+                  onResolve={handleResolve}
+                />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
       </div>
     </div>
   );

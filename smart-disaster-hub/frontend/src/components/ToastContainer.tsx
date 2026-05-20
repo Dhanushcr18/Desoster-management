@@ -77,7 +77,7 @@ interface ToastContainerProps {
 
 export default function ToastContainer({ toasts, onClose }: ToastContainerProps) {
   return (
-    <div className="fixed top-20 right-4 z-50 space-y-4">
+    <div className="fixed top-20 right-4 space-y-4" style={{ zIndex: 9999 }}>
       {toasts.map((toast) => (
         <Toast key={toast.id} {...toast} onClose={onClose} />
       ))}

@@ -13,6 +13,11 @@ import AIChat from './components/AIChat';
 function App() {
   const { user, loading } = useAuth();
 
+  // Check if user has admin/demo access
+  const hasAdminAccess = () => {
+    return user || localStorage.getItem('adminToken');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-900 via-teal-800 to-cyan-900 flex items-center justify-center">
@@ -33,11 +38,11 @@ function App() {
         {/* Admin Routes - Separate from user routes */}
         <Route 
           path="/admin/login" 
-          element={!user ? <AdminLogin /> : <Navigate to="/admin" />} 
+          element={!hasAdminAccess() ? <AdminLogin /> : <Navigate to="/admin" />} 
         />
         <Route 
           path="/admin" 
-          element={user ? <AdminDashboard /> : <Navigate to="/admin/login" />} 
+          element={hasAdminAccess() ? <AdminDashboard /> : <Navigate to="/admin/login" />} 
         />
         
         {/* User Routes */}

@@ -52,6 +52,30 @@ export default function ClimateReport({ onClose }: ClimateReportProps) {
 
   const API_KEY = '895284fb2d2c50a520ea537456963d9c'; // OpenWeatherMap API key
 
+  const processWeatherData = (data: any) => {
+    const weather: WeatherData = {
+      location: data.sys?.country ? `${data.name}, ${data.sys.country}` : data.name,
+      temp: Math.round(data.main.temp),
+      feelsLike: Math.round(data.main.feels_like),
+      humidity: data.main.humidity,
+      windSpeed: data.wind.speed,
+      windDeg: data.wind.deg,
+      pressure: data.main.pressure,
+      visibility: (data.visibility || 10000) / 1000,
+      description: data.weather[0].description,
+      icon: data.weather[0].icon,
+      sunrise: data.sys?.sunrise || 0,
+      sunset: data.sys?.sunset || 0,
+      lat: data.coord.lat,
+      lon: data.coord.lon,
+      rainfall: data.rain?.['1h'] || 0,
+      clouds: data.clouds?.all || 0
+    };
+
+    setWeatherData(weather);
+    setMapCenter([weather.lat, weather.lon]);
+  };
+
   const fetchWeatherByCoords = async (lat: number, lon: number) => {
     try {
       setLoading(true);
@@ -66,28 +90,7 @@ export default function ClimateReport({ onClose }: ClimateReportProps) {
       }
 
       const data = await response.json();
-      
-      const weather: WeatherData = {
-        location: `${data.name}, ${data.sys.country}`,
-        temp: Math.round(data.main.temp),
-        feelsLike: Math.round(data.main.feels_like),
-        humidity: data.main.humidity,
-        windSpeed: data.wind.speed,
-        windDeg: data.wind.deg,
-        pressure: data.main.pressure,
-        visibility: data.visibility / 1000,
-        description: data.weather[0].description,
-        icon: data.weather[0].icon,
-        sunrise: data.sys.sunrise,
-        sunset: data.sys.sunset,
-        lat: data.coord.lat,
-        lon: data.coord.lon,
-        rainfall: data.rain?.['1h'] || 0,
-        clouds: data.clouds.all
-      };
-
-      setWeatherData(weather);
-      setMapCenter([weather.lat, weather.lon]);
+      processWeatherData(data);
     } catch (err: any) {
       setError(err.message || 'Failed to load weather data');
     } finally {
@@ -101,7 +104,7 @@ export default function ClimateReport({ onClose }: ClimateReportProps) {
       setError('');
       
       const response = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`
+        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`
       );
 
       if (!response.ok) {
@@ -109,9 +112,10 @@ export default function ClimateReport({ onClose }: ClimateReportProps) {
       }
 
       const data = await response.json();
-      fetchWeatherByCoords(data.coord.lat, data.coord.lon);
+      processWeatherData(data);
     } catch (err: any) {
       setError(err.message || 'Failed to find city');
+    } finally {
       setLoading(false);
     }
   };
@@ -157,7 +161,7 @@ export default function ClimateReport({ onClose }: ClimateReportProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" style={{ zIndex: 9998 }}>
       <div className="bg-white rounded-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden shadow-2xl">
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-500 via-cyan-500 to-teal-500 p-6 text-white">

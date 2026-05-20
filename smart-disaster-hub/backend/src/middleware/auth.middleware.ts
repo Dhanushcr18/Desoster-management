@@ -38,3 +38,23 @@ export const authenticate = (
     res.status(401).json({ message: 'Invalid token' });
   }
 };
+
+// Optional auth - attaches userId if token present, but never blocks the request
+export const optionalAuthenticate = (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): void => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
+      const decoded = jwt.verify(token, jwtSecret) as { userId: string };
+      req.userId = decoded.userId;
+    }
+  } catch (_) {
+    // Ignore token errors for optional auth
+  }
+  next();
+};

@@ -16,6 +16,9 @@ import { errorHandler } from './middleware/error.middleware';
 // Load environment variables
 dotenv.config();
 
+// Initialize models (must be done before using routes)
+import './config/models';
+
 // Initialize Express app
 const app: Express = express();
 const httpServer = createServer(app);

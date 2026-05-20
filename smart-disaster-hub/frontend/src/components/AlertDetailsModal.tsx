@@ -4,6 +4,8 @@ import { formatDistanceToNow } from '../utils/date';
 import LocationReports from './LocationReports';
 import axios from 'axios';
 
+const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001';
+
 interface AlertDetailsModalProps {
   alert: any;
   onClose: () => void;
@@ -30,7 +32,7 @@ export default function AlertDetailsModal({ alert, onClose, onUpdateStatus }: Al
       setLoadingReports(true);
       const token = localStorage.getItem('token');
       const response = await axios.get(
-        `http://localhost:3000/api/alerts/${alert._id}/location-reports`,
+        `${API_URL}/api/alerts/${alert._id}/location-reports`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
@@ -79,14 +81,15 @@ export default function AlertDetailsModal({ alert, onClose, onUpdateStatus }: Al
         newPhotos.push(base64);
       }
 
-      // Upload photos to the alert
+      // Upload photos to the alert (token optional)
       const token = localStorage.getItem('token');
+      const headers: any = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const response = await axios.patch(
-        `http://localhost:3000/api/alerts/${alert._id}/photos`,
+        `${API_URL}/api/alerts/${alert._id}/photos`,
         { photos: newPhotos },
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
+        { headers }
       );
 
       // Update local state with new photos
@@ -123,7 +126,7 @@ export default function AlertDetailsModal({ alert, onClose, onUpdateStatus }: Al
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style={{ zIndex: 9998 }}>
       <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className={`relative bg-gradient-to-r ${
@@ -188,13 +191,13 @@ export default function AlertDetailsModal({ alert, onClose, onUpdateStatus }: Al
                 <div>
                   <p className="text-sm text-gray-500">Latitude</p>
                   <p className="text-lg font-semibold text-gray-900">
-                    {alert.geometry?.coordinates[1]?.toFixed(4)}°
+                    {Number(alert.geometry?.coordinates?.[1] ?? alert.latitude ?? 0).toFixed(4)}°
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Longitude</p>
                   <p className="text-lg font-semibold text-gray-900">
-                    {alert.geometry?.coordinates[0]?.toFixed(4)}°
+                    {Number(alert.geometry?.coordinates?.[0] ?? alert.longitude ?? 0).toFixed(4)}°
                   </p>
                 </div>
               </div>

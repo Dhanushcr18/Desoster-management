@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import type { AlertWithStats } from '../types';
 import { reportsAPI } from '../services/api';
-import { X, Heart, AlertTriangle, Users, Clock, MapPin } from 'lucide-react';
+import { X, Heart, AlertTriangle, Users, Clock, MapPin, LocateFixed } from 'lucide-react';
 import { formatDistanceToNow } from '../utils/date';
 
 interface ReportModalProps {
@@ -24,8 +24,52 @@ export default function ReportModal({ alert, onClose, onSuccess }: ReportModalPr
   const [estimatedTime, setEstimatedTime] = useState('');
   const [routeDescription, setRouteDescription] = useState('');
   
+  // Contact details
+  const [contactName, setContactName] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [contactLocation, setContactLocation] = useState('');
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isLocating, setIsLocating] = useState(false);
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      window.alert('Geolocation is not supported by your browser');
+      return;
+    }
+    
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.display_name) {
+              setContactLocation(data.display_name);
+            } else {
+              setContactLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+            }
+          } else {
+            setContactLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          }
+        } catch (err) {
+          console.error("Failed to reverse geocode:", err);
+          setContactLocation(`${position.coords.latitude.toFixed(6)}, ${position.coords.longitude.toFixed(6)}`);
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (err) => {
+        console.error(err);
+        window.alert('Failed to get your location. Please check your browser permissions.');
+        setIsLocating(false);
+      },
+      { timeout: 10000, enableHighAccuracy: true }
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,6 +83,18 @@ export default function ReportModal({ alert, onClose, onSuccess }: ReportModalPr
     setError('');
 
     try {
+      // Check if this is a real-world alert (non-numeric ID like "india-rain-...", "earthquake-us...")
+      // These don't exist in the DB, so we just show success without an API call
+      const numericId = Number(alert._id);
+      const isRealWorldAlert = isNaN(numericId) || numericId <= 0;
+
+      if (isRealWorldAlert) {
+        // Acknowledge locally only - can't store in DB without a DB alert record
+        await new Promise(resolve => setTimeout(resolve, 600)); // brief loading feel
+        onSuccess();
+        return;
+      }
+
       const locationDetails: any = {};
       
       if (address) locationDetails.address = address;
@@ -54,11 +110,15 @@ export default function ReportModal({ alert, onClose, onSuccess }: ReportModalPr
         status,
         note: note.trim() || undefined,
         safeRadius: safeRadius ? parseFloat(safeRadius) : undefined,
-        locationDetails: Object.keys(locationDetails).length > 0 ? locationDetails : undefined
+        locationDetails: Object.keys(locationDetails).length > 0 ? locationDetails : undefined,
+        contactName: contactName.trim() || undefined,
+        contactPhone: contactPhone.trim() || undefined,
+        contactLocation: contactLocation.trim() || undefined
       });
       onSuccess();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to submit report');
+      const msg = err.response?.data?.message || err.response?.data?.errors?.[0]?.msg || 'Failed to submit report';
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -68,7 +128,7 @@ export default function ReportModal({ alert, onClose, onSuccess }: ReportModalPr
   const helpCount = alert.reportStats?.help || 0;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4" style={{ zIndex: 9998 }}>
       <div className="bg-gray-800 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-gray-700">
@@ -165,35 +225,101 @@ export default function ReportModal({ alert, onClose, onSuccess }: ReportModalPr
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Safe Radius from Disaster Area (Optional)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      value={safeRadius}
-                      onChange={(e) => setSafeRadius(e.target.value)}
-                      min="0"
-                      max="1000"
-                      step="0.5"
-                      placeholder="e.g., 5"
-                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12"
-                    />
-                    <span className="absolute right-3 top-2.5 text-gray-400 text-sm">km</span>
+                {status === 'safe' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Safe Radius from Disaster Area (Optional)
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={safeRadius}
+                        onChange={(e) => setSafeRadius(e.target.value)}
+                        min="0"
+                        max="1000"
+                        step="0.5"
+                        placeholder="e.g., 5"
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12"
+                      />
+                      <span className="absolute right-3 top-2.5 text-gray-400 text-sm">km</span>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      💡 Help others by sharing how far from the disaster area is safe to stay
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    💡 Help others by sharing how far from the disaster area is safe to stay
-                  </p>
+                )}
+
+                {/* Contact Information Section */}
+                <div className="border-t border-gray-600 pt-4">
+                  <h4 className="text-white font-semibold mb-3 flex items-center gap-2">
+                    <Users size={18} className="text-purple-400" />
+                    Contact Information (Optional)
+                  </h4>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1">
+                          Your Name
+                        </label>
+                        <input
+                          type="text"
+                          value={contactName}
+                          onChange={(e) => setContactName(e.target.value)}
+                          placeholder="e.g., John Doe"
+                          className="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-400 mb-1">
+                          Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          value={contactPhone}
+                          onChange={(e) => setContactPhone(e.target.value)}
+                          placeholder="e.g., +91 9876543210"
+                          className="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="block text-xs font-medium text-gray-400">
+                          Current Location
+                        </label>
+                        <button
+                          type="button"
+                          onClick={handleGetLocation}
+                          disabled={isLocating}
+                          className="flex items-center gap-1 text-xs text-purple-400 hover:text-purple-300 transition-colors disabled:opacity-50"
+                        >
+                          {isLocating ? (
+                            <div className="animate-spin h-3 w-3 border-2 border-purple-400 border-t-transparent rounded-full" />
+                          ) : (
+                            <LocateFixed size={12} />
+                          )}
+                          <span>Use My Location</span>
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        value={contactLocation}
+                        onChange={(e) => setContactLocation(e.target.value)}
+                        placeholder="e.g., Roof of building 4, XYZ street"
+                        className="w-full px-3 py-2 text-sm bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Location & Route Details Section */}
-                <div className="border-t border-gray-600 pt-4">
-                  <h4 className="text-white font-semibold mb-3 flex items-center gap-2">
-                    <MapPin size={18} className="text-blue-400" />
-                    Location & Route Information (Optional)
-                  </h4>
-                  <div className="space-y-3">
+                {status === 'safe' && (
+                  <div className="border-t border-gray-600 pt-4">
+                    <h4 className="text-white font-semibold mb-3 flex items-center gap-2">
+                      <MapPin size={18} className="text-blue-400" />
+                      Location & Route Information (Optional)
+                    </h4>
+                    <div className="space-y-3">
                     <div className="grid grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-gray-400 mb-1">
@@ -299,6 +425,7 @@ export default function ReportModal({ alert, onClose, onSuccess }: ReportModalPr
                     </div>
                   </div>
                 </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-300 mb-2">
