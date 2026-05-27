@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.routes';
 import alertRoutes from './routes/alert.routes';
 import reportRoutes from './routes/report.routes';
 import aiRoutes from './routes/ai.routes';
+import roadRoutes from './routes/road.routes';
 import { initializeSocketIO } from './sockets/socket.handler';
 import { errorHandler } from './middleware/error.middleware';
 
@@ -54,6 +55,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/roads', roadRoutes);
 app.use('/api/ai', aiRoutes);
 
 // Initialize Socket.IO handlers

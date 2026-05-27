@@ -2,65 +2,17 @@ import { useEffect, useState, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import axios from 'axios';
 
 // ─── Road data structure ──────────────────────────────────────────────────────
 interface Road {
-  id: string;
+  id: number;
   name: string;
   coordinates: [number, number][];
-  type: 'affected' | 'alternate';
+  status: 'affected' | 'alternate' | 'normal';
+  description?: string;
+  severity?: 'low' | 'medium' | 'high' | 'critical';
 }
-
-// Sample road data
-const SAMPLE_ROADS: Road[] = [
-  {
-    id: 'main-highway-1',
-    name: 'Main Highway (Affected)',
-    type: 'affected',
-    coordinates: [
-      [20.5, 78.5],
-      [20.7, 78.8],
-      [21.0, 79.2],
-      [21.3, 79.5],
-      [21.6, 79.8],
-    ],
-  },
-  {
-    id: 'alt-route-1',
-    name: 'Alternate Route 1',
-    type: 'alternate',
-    coordinates: [
-      [20.3, 78.2],
-      [20.6, 78.6],
-      [21.0, 79.0],
-      [21.4, 79.6],
-      [21.8, 80.0],
-    ],
-  },
-  {
-    id: 'alt-route-2',
-    name: 'Alternate Route 2',
-    type: 'alternate',
-    coordinates: [
-      [20.8, 78.0],
-      [21.1, 78.5],
-      [21.4, 79.0],
-      [21.7, 79.5],
-      [22.0, 80.0],
-    ],
-  },
-  {
-    id: 'secondary-affected',
-    name: 'Secondary Road (Affected)',
-    type: 'affected',
-    coordinates: [
-      [20.2, 78.8],
-      [20.5, 79.2],
-      [20.8, 79.6],
-      [21.1, 80.0],
-    ],
-  },
-];
 
 
 // ─── Coordinate helper ───────────────────────────────────────────────────────
@@ -218,12 +170,40 @@ export default function MapView({ alerts, onAlertClick }: MapViewProps) {
   const [mapStyle, setMapStyle] = useState<'street' | 'satellite' | 'dark'>('dark');
   const [showAffectedRoads, setShowAffectedRoads] = useState(true);
   const [showAlternateRoads, setShowAlternateRoads] = useState(true);
+  const [roads, setRoads] = useState<Road[]>([]);
+  const [loadingRoads, setLoadingRoads] = useState(false);
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
       pos => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
       () => {}
     );
+  }, []);
+
+  // Fetch roads from API
+  useEffect(() => {
+    const fetchRoads = async () => {
+      try {
+        setLoadingRoads(true);
+        const response = await axios.get('http://localhost:3001/api/roads/all');
+        const roadsData = response.data.map((road: any) => ({
+          id: road.id,
+          name: road.name,
+          coordinates: road.coordinates,
+          status: road.status,
+          description: road.description,
+          severity: road.severity,
+        }));
+        setRoads(roadsData);
+      } catch (error) {
+        console.error('Error fetching roads:', error);
+        // Silently fail - UI will just show no roads
+      } finally {
+        setLoadingRoads(false);
+      }
+    };
+
+    fetchRoads();
   }, []);
 
   // Filter by layer toggles
@@ -456,7 +436,7 @@ export default function MapView({ alerts, onAlertClick }: MapViewProps) {
         <MapUpdater alerts={validAlerts} />
 
         {/* Roads - Affected (Red) */}
-        {showAffectedRoads && SAMPLE_ROADS.filter(r => r.type === 'affected').map(road => (
+        {showAffectedRoads && roads.filter(r => r.status === 'affected').map(road => (
           <Polyline
             key={road.id}
             positions={road.coordinates}
@@ -473,15 +453,20 @@ export default function MapView({ alerts, onAlertClick }: MapViewProps) {
               <div style={{ textAlign: 'center', padding: '4px 8px' }}>
                 <strong>🚫 {road.name}</strong>
                 <p style={{ margin: '4px 0', fontSize: 12, color: '#666' }}>
-                  This road is affected by a disaster
+                  {road.description || 'This road is affected by a disaster'}
                 </p>
+                {road.severity && (
+                  <p style={{ margin: '4px 0', fontSize: 11, color: '#999' }}>
+                    Severity: {road.severity.toUpperCase()}
+                  </p>
+                )}
               </div>
             </Popup>
           </Polyline>
         ))}
 
         {/* Roads - Alternate (Green) */}
-        {showAlternateRoads && SAMPLE_ROADS.filter(r => r.type === 'alternate').map(road => (
+        {showAlternateRoads && roads.filter(r => r.status === 'alternate').map(road => (
           <Polyline
             key={road.id}
             positions={road.coordinates}
@@ -498,7 +483,7 @@ export default function MapView({ alerts, onAlertClick }: MapViewProps) {
               <div style={{ textAlign: 'center', padding: '4px 8px' }}>
                 <strong>✅ {road.name}</strong>
                 <p style={{ margin: '4px 0', fontSize: 12, color: '#666' }}>
-                  Safe alternate route available
+                  {road.description || 'Safe alternate route available'}
                 </p>
               </div>
             </Popup>
