@@ -8,7 +8,7 @@ import {
   updateRoadStatus,
   deleteRoad,
 } from '../controllers/road.controller';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authenticate } from '../middleware/auth.middleware';
 
 const router = Router();
 
@@ -18,9 +18,9 @@ router.get('/affected', getAffectedRoads);
 router.get('/alternate', getAlternateRoutes);
 
 // Protected endpoints (require authentication)
-router.post('/report-affected', authMiddleware, reportAffectedRoad);
-router.post('/report-alternate', authMiddleware, reportAlternateRoute);
-router.put('/:id', authMiddleware, updateRoadStatus);
-router.delete('/:id', authMiddleware, deleteRoad);
+router.post('/report-affected', authenticate, reportAffectedRoad);
+router.post('/report-alternate', authenticate, reportAlternateRoute);
+router.put('/:id', authenticate, updateRoadStatus);
+router.delete('/:id', authenticate, deleteRoad);
 
 export default router;

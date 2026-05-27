@@ -6,7 +6,7 @@ export interface IRoad {
   name: string;
   description?: string;
   status: 'affected' | 'alternate' | 'normal';
-  coordinates: string; // JSON array of [lat, lng] pairs
+  coordinates: [number, number][]; // JSON array of [lat, lng] pairs
   severity?: 'low' | 'medium' | 'high' | 'critical';
   reportedBy?: number; // User ID who reported it
   relatedAlertId?: number; // Link to related alert
@@ -19,7 +19,7 @@ class Road extends Model<IRoad> implements IRoad {
   public name!: string;
   public description?: string;
   public status!: 'affected' | 'alternate' | 'normal';
-  public coordinates!: string;
+  public coordinates!: [number, number][];
   public severity?: 'low' | 'medium' | 'high' | 'critical';
   public reportedBy?: number;
   public relatedAlertId?: number;

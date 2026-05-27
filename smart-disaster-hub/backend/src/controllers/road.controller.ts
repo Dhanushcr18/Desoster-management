@@ -58,7 +58,7 @@ export const getAlternateRoutes = async (req: Request, res: Response) => {
 export const reportAffectedRoad = async (req: Request, res: Response) => {
   try {
     const { name, description, coordinates, severity, relatedAlertId } = req.body;
-    const userId = (req as any).user?.id;
+    const userId = (req as any).userId;
 
     if (!name || !coordinates || !Array.isArray(coordinates)) {
       return res.status(400).json({ 
@@ -87,7 +87,7 @@ export const reportAffectedRoad = async (req: Request, res: Response) => {
 export const reportAlternateRoute = async (req: Request, res: Response) => {
   try {
     const { name, description, coordinates, relatedAlertId } = req.body;
-    const userId = (req as any).user?.id;
+    const userId = (req as any).userId;
 
     if (!name || !coordinates || !Array.isArray(coordinates)) {
       return res.status(400).json({ 
