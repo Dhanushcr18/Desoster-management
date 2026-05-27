@@ -1,7 +1,67 @@
 import { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap, ZoomControl, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+
+// ─── Road data structure ──────────────────────────────────────────────────────
+interface Road {
+  id: string;
+  name: string;
+  coordinates: [number, number][];
+  type: 'affected' | 'alternate';
+}
+
+// Sample road data
+const SAMPLE_ROADS: Road[] = [
+  {
+    id: 'main-highway-1',
+    name: 'Main Highway (Affected)',
+    type: 'affected',
+    coordinates: [
+      [20.5, 78.5],
+      [20.7, 78.8],
+      [21.0, 79.2],
+      [21.3, 79.5],
+      [21.6, 79.8],
+    ],
+  },
+  {
+    id: 'alt-route-1',
+    name: 'Alternate Route 1',
+    type: 'alternate',
+    coordinates: [
+      [20.3, 78.2],
+      [20.6, 78.6],
+      [21.0, 79.0],
+      [21.4, 79.6],
+      [21.8, 80.0],
+    ],
+  },
+  {
+    id: 'alt-route-2',
+    name: 'Alternate Route 2',
+    type: 'alternate',
+    coordinates: [
+      [20.8, 78.0],
+      [21.1, 78.5],
+      [21.4, 79.0],
+      [21.7, 79.5],
+      [22.0, 80.0],
+    ],
+  },
+  {
+    id: 'secondary-affected',
+    name: 'Secondary Road (Affected)',
+    type: 'affected',
+    coordinates: [
+      [20.2, 78.8],
+      [20.5, 79.2],
+      [20.8, 79.6],
+      [21.1, 80.0],
+    ],
+  },
+];
+
 
 // ─── Coordinate helper ───────────────────────────────────────────────────────
 function getLatLng(alert: any): [number, number] | null {
@@ -156,6 +216,8 @@ export default function MapView({ alerts, onAlertClick }: MapViewProps) {
   const [showRealWorld, setShowRealWorld] = useState(true);
   const [showCommunity, setShowCommunity] = useState(true);
   const [mapStyle, setMapStyle] = useState<'street' | 'satellite' | 'dark'>('dark');
+  const [showAffectedRoads, setShowAffectedRoads] = useState(true);
+  const [showAlternateRoads, setShowAlternateRoads] = useState(true);
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
@@ -275,6 +337,48 @@ export default function MapView({ alerts, onAlertClick }: MapViewProps) {
               👥 Community ({communityCount})
             </span>
           </label>
+
+          {/* Affected roads toggle */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <div
+              onClick={() => setShowAffectedRoads(v => !v)}
+              style={{
+                width: 36, height: 20, borderRadius: 10,
+                background: showAffectedRoads ? '#ef4444' : '#4b5563',
+                position: 'relative', transition: 'background 0.2s', cursor: 'pointer',
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 3, left: showAffectedRoads ? 18 : 3,
+                width: 14, height: 14, borderRadius: '50%', background: '#fff',
+                transition: 'left 0.2s',
+              }}/>
+            </div>
+            <span style={{ color: '#fecaca', fontSize: 12, fontWeight: 600 }}>
+              🚫 Affected Roads
+            </span>
+          </label>
+
+          {/* Alternate roads toggle */}
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <div
+              onClick={() => setShowAlternateRoads(v => !v)}
+              style={{
+                width: 36, height: 20, borderRadius: 10,
+                background: showAlternateRoads ? '#22c55e' : '#4b5563',
+                position: 'relative', transition: 'background 0.2s', cursor: 'pointer',
+              }}
+            >
+              <div style={{
+                position: 'absolute', top: 3, left: showAlternateRoads ? 18 : 3,
+                width: 14, height: 14, borderRadius: '50%', background: '#fff',
+                transition: 'left 0.2s',
+              }}/>
+            </div>
+            <span style={{ color: '#bbf7d0', fontSize: 12, fontWeight: 600 }}>
+              ✅ Alternate Routes
+            </span>
+          </label>
         </div>
 
         {/* Map style switcher */}
@@ -311,7 +415,7 @@ export default function MapView({ alerts, onAlertClick }: MapViewProps) {
         border: '1px solid rgba(255,255,255,0.15)',
       }}>
         <div style={{ color: '#9ca3af', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>
-          Severity
+          Severity & Roads
         </div>
         {[
           { label: 'Critical', color: '#7c3aed', emoji: '🔴' },
@@ -325,9 +429,17 @@ export default function MapView({ alerts, onAlertClick }: MapViewProps) {
           </div>
         ))}
         <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: 8, paddingTop: 8 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
             <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e' }}/>
             <span style={{ color: '#86efac', fontSize: 11 }}>● Live Real-World Data</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <div style={{ width: 16, height: 3, background: '#ef4444' }}/>
+            <span style={{ color: '#fecaca', fontSize: 11 }}>🚫 Affected Road</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ width: 16, height: 3, background: '#22c55e' }}/>
+            <span style={{ color: '#bbf7d0', fontSize: 11 }}>✅ Alternate Route</span>
           </div>
         </div>
       </div>
@@ -342,6 +454,56 @@ export default function MapView({ alerts, onAlertClick }: MapViewProps) {
         <TileLayer url={tile.url} attribution={tile.attr} />
         <ZoomControl position="bottomright" />
         <MapUpdater alerts={validAlerts} />
+
+        {/* Roads - Affected (Red) */}
+        {showAffectedRoads && SAMPLE_ROADS.filter(r => r.type === 'affected').map(road => (
+          <Polyline
+            key={road.id}
+            positions={road.coordinates}
+            pathOptions={{
+              color: '#ef4444',
+              weight: 6,
+              opacity: 1,
+              dashArray: '8,4',
+              lineCap: 'round',
+              lineJoin: 'round',
+            }}
+          >
+            <Popup>
+              <div style={{ textAlign: 'center', padding: '4px 8px' }}>
+                <strong>🚫 {road.name}</strong>
+                <p style={{ margin: '4px 0', fontSize: 12, color: '#666' }}>
+                  This road is affected by a disaster
+                </p>
+              </div>
+            </Popup>
+          </Polyline>
+        ))}
+
+        {/* Roads - Alternate (Green) */}
+        {showAlternateRoads && SAMPLE_ROADS.filter(r => r.type === 'alternate').map(road => (
+          <Polyline
+            key={road.id}
+            positions={road.coordinates}
+            pathOptions={{
+              color: '#22c55e',
+              weight: 6,
+              opacity: 1,
+              dashArray: '0',
+              lineCap: 'round',
+              lineJoin: 'round',
+            }}
+          >
+            <Popup>
+              <div style={{ textAlign: 'center', padding: '4px 8px' }}>
+                <strong>✅ {road.name}</strong>
+                <p style={{ margin: '4px 0', fontSize: 12, color: '#666' }}>
+                  Safe alternate route available
+                </p>
+              </div>
+            </Popup>
+          </Polyline>
+        ))}
 
         {/* User location marker */}
         {userLocation && (
