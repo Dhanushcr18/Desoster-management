@@ -1,414 +1,258 @@
-# Smart Disaster Hub 🚨
-
-A real-time disaster alert and coordination system that helps communities stay informed and connected during emergencies.
-
-## 🎯 Overview
-
-Smart Disaster Hub is a full-stack application that provides:
-- **Real-time disaster alerts** with geographic mapping
-- **AI-powered chatbot** using Google Gemini for disaster assistance
-- **Community coordination** - mark yourself safe or request help
-- **Live updates** via WebSocket connections
-- **Mobile-responsive** dashboard with interactive map
-- **Secure authentication** and data protection
-
-## 🛠 Tech Stack
-
-### Frontend
-- **React 18** with TypeScript
-- **Vite** - Fast build tool
-- **Tailwind CSS** - Utility-first styling
-- **Leaflet** - Interactive maps (OpenStreetMap tiles)
-- **Socket.IO Client** - Real-time communication
-- **Vitest** - Unit testing
-
-### Backend
-- **Node.js 18+** with Express
-- **TypeScript** - Type-safe backend
-- **MongoDB** with Mongoose ODM
-- **Socket.IO** - WebSocket server
-- **Google Gemini AI** - Intelligent chatbot (optional)
-- **JWT** - Secure authentication
-- **bcrypt** - Password hashing
-- **express-validator** - Input validation
-- **Supertest** - Integration testing
-
-### DevOps
-- **Docker & Docker Compose** - Containerization
-- **MongoDB** - Persistent data storage
-
-## 📋 Prerequisites
-
-- Node.js 18+ and npm/yarn
-- Docker and Docker Compose (for containerized setup)
-- MongoDB (if running locally without Docker)
-
-## 🚀 Quick Start
-
-### Option 1: Docker Compose (Recommended)
-
-1. **Clone and navigate to project**
-```bash
-cd smart-disaster-hub
-```
-
-2. **Create environment files**
-```bash
-# Backend environment
-cp backend/.env.example backend/.env
-
-# Frontend environment
-cp frontend/.env.example frontend/.env
-```
-
-3. **Start all services**
-```bash
-docker-compose up --build
-```
-
-4. **Access the application**
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:3000
-- MongoDB: localhost:27017
-
-### Option 2: Local Development
-
-#### Backend Setup
-
-1. **Navigate to backend**
-```bash
-cd backend
-```
-
-2. **Install dependencies**
-```bash
-npm install
-```
-
-3. **Configure environment**
-```bash
-cp .env.example .env
-# Edit .env with your settings
-```
-
-**Optional: Enable Gemini AI Chatbot**
-```bash
-# Get your free API key from https://aistudio.google.com/apikey
-# Add to .env:
-GEMINI_API_KEY=your_api_key_here
-```
-See [GEMINI_SETUP.md](GEMINI_SETUP.md) for detailed AI integration guide.
-
-4. **Start MongoDB** (if not using Docker)
-```bash
-# macOS/Linux with Homebrew
-brew services start mongodb-community
-
-# Windows
-net start MongoDB
-
-# Or use Docker
-docker run -d -p 27017:27017 --name mongodb mongo:7
-```
-
-5. **Run backend**
-```bash
-# Development mode with hot reload
-npm run dev
-
-# Production build
-npm run build
-npm start
-```
-
-Backend runs on: http://localhost:3000
-
-#### Frontend Setup
-
-1. **Navigate to frontend**
-```bash
-cd frontend
-```
-
-2. **Install dependencies**
-```bash
-npm install
-```
-
-3. **Configure environment**
-```bash
-cp .env.example .env
-# Edit .env if needed
-```
-
-4. **Run frontend**
-```bash
-npm run dev
-```
-
-Frontend runs on: http://localhost:5173
-
-## 🧪 Running Tests
-
-### Backend Tests
-```bash
-cd backend
-npm test
-```
-
-### Frontend Tests
-```bash
-cd frontend
-npm test
-```
-
-## 📁 Project Structure
-
-```
-smart-disaster-hub/
-├── backend/
-│   ├── src/
-│   │   ├── models/          # Mongoose schemas
-│   │   ├── routes/          # Express routes
-│   │   ├── controllers/     # Route handlers
-│   │   ├── middleware/      # Auth, validation
-│   │   ├── services/        # Business logic
-│   │   ├── utils/           # Helper functions
-│   │   ├── config/          # Configuration
-│   │   ├── sockets/         # Socket.IO handlers
-│   │   └── server.ts        # Entry point
-│   ├── tests/               # Integration tests
-│   ├── Dockerfile
-│   └── package.json
-├── frontend/
-│   ├── src/
-│   │   ├── components/      # React components
-│   │   ├── services/        # API & Socket clients
-│   │   ├── context/         # React context
-│   │   ├── hooks/           # Custom hooks
-│   │   ├── utils/           # Helper functions
-│   │   ├── types/           # TypeScript types
-│   │   └── App.tsx          # Root component
-│   ├── tests/               # Unit tests
-│   └── package.json
-├── docker-compose.yml
-└── README.md
-```
-
-## 🔑 Environment Variables
-
-### Backend (.env)
-```
-PORT=3000
-MONGODB_URI=mongodb://localhost:27017/disaster-hub
-JWT_SECRET=your-super-secret-jwt-key-change-in-production
-JWT_EXPIRES_IN=7d
-NODE_ENV=development
-
-# Optional: External API integrations
-OPENWEATHER_API_KEY=your-api-key-here
-TWILIO_ACCOUNT_SID=your-twilio-sid
-TWILIO_AUTH_TOKEN=your-twilio-token
-TWILIO_PHONE_NUMBER=+1234567890
-```
-
-### Frontend (.env)
-```
-VITE_API_URL=http://localhost:3000
-VITE_SOCKET_URL=http://localhost:3000
-
-# Optional: Switch to Mapbox (requires API key)
-# VITE_MAPBOX_TOKEN=your-mapbox-token
-```
-
-## 🗺 Map Integration
-
-### Using OpenStreetMap (Default - No API Key)
-The app uses Leaflet with OpenStreetMap tiles by default. No configuration needed!
-
-### Switching to Mapbox
-1. Get a free API key from https://www.mapbox.com/
-2. Add to `frontend/.env`:
-```
-VITE_MAPBOX_TOKEN=pk.your-token-here
-```
-3. Uncomment Mapbox layer in `frontend/src/components/MapView.tsx`
-
-## 📱 SMS Notifications (Optional)
-
-To enable Twilio SMS alerts:
-
-1. Sign up at https://www.twilio.com/
-2. Add credentials to `backend/.env`
-3. Uncomment Twilio service calls in `backend/src/services/notification.service.ts`
-
-## 🎭 Demo Flow (30-60 seconds)
-
-Perfect for hackathon judges!
-
-1. **Open the app** - Show the clean, responsive dashboard
-2. **Register/Login** - Quick signup flow
-3. **View live map** - Point out real-time alert markers
-4. **Show sidebar** - Highlight active alerts with severity levels
-5. **Click an alert** - Display details modal
-6. **Mark status** - Click "I'm Safe" or "Request Help"
-7. **Real-time update** - Show counter updating instantly (open second browser tab to demo)
-8. **Create alert** (if time) - Show admin creating new alert
-9. **Watch it appear** - Real-time Socket.IO update on map
-
-### Demo Data
-The backend includes seed data with sample alerts. Run:
-```bash
-cd backend
-npm run seed
-```
-
-## 🔒 Security Notes
-
-### For Production
-- [ ] Change `JWT_SECRET` to a strong, random value
-- [ ] Enable HTTPS/TLS
-- [ ] Set up CORS properly
-- [ ] Add rate limiting
-- [ ] Enable MongoDB authentication
-- [ ] Use environment-specific configs
-- [ ] Add input sanitization
-- [ ] Implement refresh tokens
-- [ ] Add audit logging
-
-### Hackathon Shortcuts
-- Simple JWT implementation (no refresh tokens)
-- Basic password validation
-- Permissive CORS for development
-- Mock external API services
-- No rate limiting (add express-rate-limit for production)
-
-## 🔧 Troubleshooting
-
-### MongoDB Connection Issues
-```bash
-# Check if MongoDB is running
-docker ps | grep mongo
-
-# View MongoDB logs
-docker logs mongodb
-```
-
-### Port Already in Use
-```bash
-# Kill process on port 3000 (backend)
-npx kill-port 3000
-
-# Kill process on port 5173 (frontend)
-npx kill-port 5173
-```
-
-### Socket.IO Connection Errors
-- Ensure backend is running first
-- Check CORS settings in `backend/src/server.ts`
-- Verify `VITE_SOCKET_URL` in frontend .env
-
-## 📦 API Documentation
-
-### Authentication
-
-#### Register
-```http
-POST /api/auth/register
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "SecurePass123!",
-  "name": "John Doe"
-}
-```
-
-#### Login
-```http
-POST /api/auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "SecurePass123!"
-}
-```
-
-### Alerts
-
-#### Get All Alerts
-```http
-GET /api/alerts?severity=high&bbox=-122.5,37.7,-122.3,37.9
-Authorization: Bearer <token>
-```
-
-#### Get Single Alert
-```http
-GET /api/alerts/:id
-Authorization: Bearer <token>
-```
-
-#### Create Alert
-```http
-POST /api/alerts
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "title": "Earthquake Warning",
-  "description": "7.2 magnitude earthquake detected",
-  "geometry": {
-    "type": "Point",
-    "coordinates": [-122.4194, 37.7749]
-  },
-  "severity": "high",
-  "source": "USGS"
-}
-```
-
-### Reports
-
-#### Submit Status Report
-```http
-POST /api/reports
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "alertId": "507f1f77bcf86cd799439011",
-  "status": "safe",
-  "note": "I'm at a safe location"
-}
-```
-
-## 🤝 Contributing
-
-This is a hackathon project, but contributions are welcome!
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file for details
-
-## 👥 Team
-
-Built with ❤️ for disaster resilience and community safety.
-
-## 🙏 Acknowledgments
-
-- OpenStreetMap contributors
-- Leaflet.js community
-- Socket.IO team
-- All open-source contributors
+# 🚨 Smart Disaster Hub
+
+[![Backend Status](https://img.shields.io/badge/Backend-Live%20on%20Render-brightgreen?logo=render)](https://desoster-management.onrender.com/health)
+[![Frontend Status](https://img.shields.io/badge/Frontend-Vercel-black?logo=vercel)](https://vercel.com)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://react.dev/)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-339933?logo=node.js)](https://nodejs.org/)
+[![Google Gemini AI](https://img.shields.io/badge/AI-Google%20Gemini-4285F4?logo=google)](https://aistudio.google.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+A modern, real-time disaster management and emergency coordination platform designed to keep communities safe, informed, and connected during natural disasters. Features real-time mapping, SOS reporting, AI-powered emergency advisory, safe route evacuation analysis, and a dedicated admin response control center.
 
 ---
 
-**Need help?** Open an issue or reach out to the team!
+## 🌐 Live Deployments
 
-**🌟 Star this repo** if you find it useful!
+| Component | Platform | URL |
+| :--- | :--- | :--- |
+| **Backend API** | Render (Docker) | [`https://desoster-management.onrender.com`](https://desoster-management.onrender.com) |
+| **Backend Health Check** | Render | [`https://desoster-management.onrender.com/health`](https://desoster-management.onrender.com/health) |
+| **Frontend Web App** | Vercel | *Your Vercel Domain* |
+
+---
+
+## ✨ Key Features
+
+- **🗺️ Interactive Disaster Mapping**: Live incident mapping powered by Leaflet & OpenStreetMap, displaying floods, wildfires, cyclones, earthquakes, and hazard zones.
+- **🤖 AI Disaster Assistant (Google Gemini)**: Built-in 24/7 intelligent assistant providing immediate emergency guidance, first-aid tips, evacuation steps, and emergency triage.
+- **📡 Real-Time WebSocket Alerts**: Instant bi-directional broadcast via Socket.IO whenever new alerts or hazards are reported.
+- **🆘 SOS & Safe Status Check-in**: Allows affected individuals to mark themselves safe or broadcast emergency help requests with geolocation and uploaded photos.
+- **🛡️ Evacuation & Safe Route Visualizer**: Dynamic route analysis helping citizens navigate safely around hazard zones and blocked roads.
+- **🔒 Dedicated Admin Control Center**: Separate secure administrator portal (`/admin/login`) featuring:
+  - Real-time disaster statistics and priority heatmaps
+  - Incident verification and status updates
+  - Photo gallery verification for field reports
+  - One-click emergency dispatch (Police, Fire, Ambulance auto-dialing)
+
+---
+
+## 🛠️ Technology Stack
+
+### Frontend
+- **Framework**: React 18 with TypeScript
+- **Bundler & Tooling**: Vite
+- **Styling**: Tailwind CSS, Lucide React Icons
+- **Mapping**: Leaflet, React-Leaflet
+- **Networking**: Axios & Socket.IO Client
+
+### Backend
+- **Runtime**: Node.js 18+ with Express & TypeScript
+- **Database & ORM**: SQLite (`disaster_hub.db`) & MySQL support via Sequelize ORM
+- **Real-Time Engine**: Socket.IO
+- **AI Integration**: Google Gemini API (`@google/generative-ai`)
+- **Security**: JWT (JSON Web Tokens), bcrypt password hashing, Helmet, CORS protection
+
+### DevOps & Deployment
+- **Backend**: Render via Docker container (Alpine Linux)
+- **Frontend**: Vercel SPA (with `vercel.json` rewrite routing)
+- **Local Dev**: Docker Compose support
+
+---
+
+## 📁 Repository Structure
+
+```text
+smart-disaster-hub/
+├── backend/
+│   ├── src/
+│   │   ├── config/            # Database (Sequelize) & models config
+│   │   ├── controllers/       # Auth, Alert, Report, Road, AI controllers
+│   │   ├── middleware/        # Auth (JWT) & error handling middleware
+│   │   ├── models/            # Sequelize models (User, Alert, Report, Road)
+│   │   ├── routes/            # Express REST route definitions
+│   │   ├── services/          # Gemini AI, external weather, notifications
+│   │   ├── sockets/           # Socket.IO connection handlers
+│   │   ├── utils/             # Database seeding utilities
+│   │   └── server.ts          # Express HTTP & Socket.IO server entrypoint
+│   ├── disaster_hub.db        # SQLite database
+│   ├── Dockerfile             # Production container definition
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/        # React UI components (Dashboard, Map, Chat, Admin)
+│   │   ├── context/           # AuthContext & state providers
+│   │   ├── services/          # API client & WebSocket client
+│   │   ├── types/             # TypeScript type definitions
+│   │   ├── App.tsx            # Main application router
+│   │   └── main.tsx           # React DOM root
+│   ├── public/                # Static assets & redirects
+│   ├── vercel.json            # Vercel SPA rewrite rules
+│   ├── package.json
+│   └── vite.config.ts
+│
+├── docker-compose.yml         # Local container orchestration
+└── README.md                  # Project documentation
+```
+
+---
+
+## 🚀 Getting Started (Local Development)
+
+### Prerequisites
+- Node.js 18.x or later installed
+- npm or yarn package manager
+- Git
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com/Dhanushcr18/Desoster-management.git
+cd Desoster-management/smart-disaster-hub
+```
+
+### 2. Backend Setup
+```bash
+cd backend
+
+# Install dependencies
+npm install
+
+# Create environment configuration
+cp .env.example .env
+```
+
+Edit `backend/.env` with your values:
+```env
+PORT=3000
+NODE_ENV=development
+JWT_SECRET=your-super-secret-jwt-key
+JWT_EXPIRES_IN=7d
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+Start the backend:
+```bash
+# Development mode (auto-reload)
+npm run dev
+
+# Or build and run production
+npm run build
+npm start
+```
+*Backend runs on: `http://localhost:3000`*
+
+### 3. Frontend Setup
+Open a new terminal window:
+```bash
+cd ../frontend
+
+# Install dependencies
+npm install
+
+# Create environment configuration
+cp .env.example .env
+```
+
+Edit `frontend/.env`:
+```env
+VITE_API_URL=http://localhost:3000
+VITE_SOCKET_URL=http://localhost:3000
+```
+
+Start the frontend:
+```bash
+npm run dev
+```
+*Frontend runs on: `http://localhost:5173`*
+
+---
+
+## 📡 API Endpoints Reference
+
+### 🔐 Authentication (`/api/auth`)
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/auth/register` | Register a new user | No |
+| `POST` | `/api/auth/login` | Authenticate & obtain JWT | No |
+| `GET` | `/api/auth/profile` | Get current logged-in user profile | Bearer Token |
+
+### 🚨 Disaster Alerts (`/api/alerts`)
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/alerts` | Get all active disaster alerts | No |
+| `POST` | `/api/alerts` | Create a new alert (broadcasts via Socket.IO) | Bearer Token |
+| `GET` | `/api/alerts/:id` | Get specific alert details | No |
+| `PUT` | `/api/alerts/:id` | Update alert status/severity | Admin |
+
+### 📋 Reports & Help Requests (`/api/reports`)
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/reports` | Get user incident/SOS reports | No |
+| `POST` | `/api/reports` | Submit emergency help request or hazard report | Optional |
+| `PUT` | `/api/reports/:id` | Update report status | Admin |
+
+### 🛣️ Safe Routes (`/api/roads`)
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/api/roads` | Fetch road status & blockage information | No |
+| `POST` | `/api/roads/report` | Report damaged or blocked roadway | Bearer Token |
+
+### 🤖 Gemini AI Assistant (`/api/ai`)
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/ai/chat` | Send question to Gemini AI assistant | No |
+
+### 💓 Health Check
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/health` | Returns server health status `{ "status": "ok" }` |
+
+---
+
+## ☁️ Deployment Guide
+
+### Deploying Backend to Render (Docker)
+1. In Render Dashboard, click **New +** > **Web Service**.
+2. Connect your GitHub repository: `Dhanushcr18/Desoster-management`.
+3. Set the following configuration:
+   - **Language**: `Docker`
+   - **Root Directory**: `smart-disaster-hub/backend`
+   - **Dockerfile Path**: `smart-disaster-hub/backend/Dockerfile`
+   - **Docker Build Context**: `smart-disaster-hub/backend`
+   - **Health Check Path**: `/health`
+4. Add **Environment Variables**:
+   - `PORT`: `3000`
+   - `NODE_ENV`: `production`
+   - `JWT_SECRET`: *(your secret or click Generate)*
+   - `JWT_EXPIRES_IN`: `7d`
+   - `GEMINI_API_KEY`: *(your Gemini key)*
+5. Click **Deploy Web Service**.
+
+### Deploying Frontend to Vercel
+1. In Vercel Dashboard, click **Add New** > **Project**.
+2. Import `Dhanushcr18/Desoster-management`.
+3. Configure settings:
+   - **Root Directory**: `smart-disaster-hub/frontend`
+   - **Framework Preset**: `Vite`
+4. Under **Environment Variables**, add:
+   - `VITE_API_URL`: `https://desoster-management.onrender.com`
+   - `VITE_SOCKET_URL`: `https://desoster-management.onrender.com`
+5. Click **Deploy**.
+
+---
+
+## 🛡️ Admin Portal Access
+
+The application features a standalone administrative portal for emergency responders:
+- **Direct Route**: Navigate to `/admin/login`
+- **Footer Link**: Click the "Administrator Access" link in the homepage footer.
+- **Capabilities**: Incident triage, live report verification, emergency caller dispatch, and alert broadcasts.
+- For complete operational details, refer to `../ADMIN_ACCESS_GUIDE.md`.
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
