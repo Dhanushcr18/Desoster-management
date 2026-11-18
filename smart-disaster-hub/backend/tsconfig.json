@@ -10,8 +10,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "moduleResolution": "node",
-    "types": ["node", "jest"],
+    "types": ["node"],
     "noEmit": false,
     "allowSyntheticDefaultImports": true
   },
