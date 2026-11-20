@@ -1,6 +1,9 @@
 import axios from 'axios';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { newsService } from './news.service';
+import Road from '../models/Road.model';
+import Shipment from '../models/Shipment.model';
+import AgentDecision from '../models/AgentDecision.model';
 
 interface AIServiceConfig {
   provider: 'gemini' | 'huggingface' | 'fallback';
@@ -50,15 +53,53 @@ Keep responses clear, actionable, and empathetic. Use emojis sparingly for bette
     return await this.chatWithFallback(message);
   }
 
+  private async buildGroundedContext(): Promise<string> {
+    try {
+      const roads = await Road.findAll({ order: [['riskScore', 'DESC']], limit: 5 });
+      const shipments = await Shipment.findAll({
+        where: { status: ['in_transit', 'rerouted', 'held', 'at_risk'] },
+        limit: 8,
+      });
+      const decisions = await AgentDecision.findAll({
+        order: [['createdAt', 'DESC']],
+        limit: 3,
+        include: [{ model: Shipment, as: 'shipment' }],
+      });
+
+      let ctx = 'CURRENT LIVE OPERATIONAL DATA (GROUND TRUTH):\n';
+      ctx += 'TOP RISKY ROADS:\n';
+      roads.forEach((r) => {
+        ctx += `- ${r.name}: Risk ${r.riskScore}% (${r.riskLevel.toUpperCase()}), 48h Rain: ${r.rainfall48h || 0}mm, Reason: ${r.riskReason || 'Normal'}\n`;
+      });
+
+      ctx += '\nACTIVE SHIPMENTS IN TRANSIT:\n';
+      shipments.forEach((s) => {
+        ctx += `- ${s.code} (${s.cargoType.toUpperCase()}, ${s.priority}): Status ${s.status}, ETA ~${s.etaMinutes}m, Driver: ${s.driverName}\n`;
+      });
+
+      ctx += '\nLATEST AGENT ACTIONS:\n';
+      decisions.forEach((d) => {
+        ctx += `- [${d.decision}] for ${d.shipment?.code || `Shipment #${d.shipmentId}`}: ${d.reasoning}\n`;
+      });
+
+      return ctx;
+    } catch {
+      return '';
+    }
+  }
+
   private async chatWithGemini(message: string): Promise<string> {
     try {
       if (!this.genAI) {
         throw new Error('Gemini AI not initialized');
       }
 
+      const groundedContext = await this.buildGroundedContext();
+      const enhancedSystemPrompt = `${this.systemPrompt}\n\n${groundedContext}\nIMPORTANT GROUNDING RULE: When the user asks about active risks, shipments, trucks, or road conditions, strictly cite the actual numbers and facts from the operational data above. If asked about an entity not listed, say: "I don't have real-time data on that." Never fabricate numbers.`;
+
       const model = this.genAI.getGenerativeModel({ 
-        model: 'gemini-2.0-flash-exp',
-        systemInstruction: this.systemPrompt
+        model: 'gemini-1.5-flash',
+        systemInstruction: enhancedSystemPrompt,
       });
 
       const chat = model.startChat({
@@ -202,6 +243,45 @@ Keep responses clear, actionable, and empathetic. Use emojis sparingly for bette
     };
 
     console.log('[AI Fallback] Intents:', intents); // Log classified intents
+
+    const isResilienceQuery =
+      userMessage.includes('risk') ||
+      userMessage.includes('shipment') ||
+      userMessage.includes('truck') ||
+      userMessage.includes('trk') ||
+      userMessage.includes('reroute') ||
+      userMessage.includes('shiradi') ||
+      userMessage.includes('wayanad') ||
+      userMessage.includes('omr') ||
+      userMessage.includes('medicine') ||
+      userMessage.includes('supply') ||
+      userMessage.includes('corridor');
+
+    if (isResilienceQuery) {
+      try {
+        const topRoads = await Road.findAll({ order: [['riskScore', 'DESC']], limit: 3 });
+        const activeShipments = await Shipment.findAll({
+          where: { status: ['in_transit', 'rerouted', 'held', 'at_risk'] },
+          limit: 4,
+        });
+
+        let ans = `🚨 **Live Supply Chain & Corridor Risk Report:**\n\n`;
+        ans += `**High-Risk Road Corridors:**\n`;
+        topRoads.forEach((r) => {
+          ans += `• **${r.name}:** Risk **${r.riskScore}%** (${r.riskLevel.toUpperCase()}) — ${r.riskReason || 'Normal'}\n`;
+        });
+
+        ans += `\n**Active Tracked Shipments:**\n`;
+        activeShipments.forEach((s) => {
+          ans += `• **${s.code}** (${s.cargoType.toUpperCase()} - ${s.priority}): Status **${s.status.toUpperCase()}** (ETA ~${s.etaMinutes} min)\n`;
+        });
+
+        ans += `\n*Real-time data from Supply Resilience Autonomous Agent.*`;
+        return ans;
+      } catch (err: any) {
+        console.warn('Fallback resilience query failed:', err.message);
+      }
+    }
 
     // Response routing based on intent
     if (userMessage.includes('what should i pack for a flood') || userMessage.includes('pack for a flood')) {

@@ -1,6 +1,8 @@
 import { DataTypes, Model } from 'sequelize';
 import sequelize from '../config/database';
 
+export type RiskLevel = 'low' | 'moderate' | 'high' | 'severe';
+
 export interface IRoad {
   id?: number;
   name: string;
@@ -10,6 +12,16 @@ export interface IRoad {
   severity?: 'low' | 'medium' | 'high' | 'critical';
   reportedBy?: number; // User ID who reported it
   relatedAlertId?: number; // Link to related alert
+  // Risk assessment fields
+  riskScore?: number;
+  riskLevel?: RiskLevel;
+  riskReason?: string;
+  rainfall24h?: number;
+  rainfall48h?: number;
+  peakHourlyRain?: number;
+  minElevation?: number;
+  riverDischargeRatio?: number | null;
+  lastAssessedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -23,6 +35,16 @@ class Road extends Model<IRoad> implements IRoad {
   public severity?: 'low' | 'medium' | 'high' | 'critical';
   public reportedBy?: number;
   public relatedAlertId?: number;
+  // Risk assessment fields
+  public riskScore?: number;
+  public riskLevel?: RiskLevel;
+  public riskReason?: string;
+  public rainfall24h?: number;
+  public rainfall48h?: number;
+  public peakHourlyRain?: number;
+  public minElevation?: number;
+  public riverDischargeRatio?: number | null;
+  public lastAssessedAt?: Date;
   public readonly createdAt!: Date;
   public readonly updatedAt!: Date;
 }
@@ -71,6 +93,48 @@ Road.init(
         model: 'Alerts',
         key: 'id',
       },
+    },
+    // Risk assessment columns
+    riskScore: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    riskLevel: {
+      type: DataTypes.ENUM('low', 'moderate', 'high', 'severe'),
+      allowNull: false,
+      defaultValue: 'low',
+    },
+    riskReason: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    rainfall24h: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    rainfall48h: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    peakHourlyRain: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+      defaultValue: 0,
+    },
+    minElevation: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    riverDischargeRatio: {
+      type: DataTypes.FLOAT,
+      allowNull: true,
+    },
+    lastAssessedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
     },
   },
   {

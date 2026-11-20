@@ -1,5 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import env from '../config/env';
 
 export const initializeSocketIO = (io: Server): void => {
   // Socket.IO middleware for authentication
@@ -11,7 +12,7 @@ export const initializeSocketIO = (io: Server): void => {
     }
 
     try {
-      const jwtSecret = process.env.JWT_SECRET || 'fallback-secret';
+      const jwtSecret = env.JWT_SECRET;
       const decoded = jwt.verify(token, jwtSecret) as { userId: string };
       (socket as any).userId = decoded.userId;
       next();

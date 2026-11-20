@@ -9,6 +9,9 @@ import Register from './components/Register';
 import Home from './components/Home';
 import Contact from './components/Contact';
 import AIChat from './components/AIChat';
+import RouteVisualizer from './components/RouteVisualizer';
+import ResilienceDashboard from './components/resilience/ResilienceDashboard';
+import DriverView from './components/resilience/DriverView';
 
 function App() {
   const { user, loading } = useAuth();
@@ -34,7 +37,15 @@ function App() {
           path="/dashboard" 
           element={user ? <Dashboard /> : <Navigate to="/login" />} 
         />
+        <Route 
+          path="/routes" 
+          element={<RouteVisualizer />} 
+        />
         
+        {/* Supply Resilience Platform Routes */}
+        <Route path="/resilience" element={<ResilienceDashboard />} />
+        <Route path="/driver/:shipmentCode" element={<DriverView />} />
+
         {/* Admin Routes - Separate from user routes */}
         <Route 
           path="/admin/login" 

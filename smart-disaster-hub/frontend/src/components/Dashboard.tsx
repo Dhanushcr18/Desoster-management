@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import MapView from './MapView';
+import RouteVisualizer from './RouteVisualizer';
 import ReportModal from './ReportModal';
 import AlertDetailsModal from './AlertDetailsModal';
 import EmergencyContacts from './EmergencyContacts';
@@ -33,7 +34,9 @@ import {
   Pill,
   UtensilsCrossed,
   ChevronDown,
-  Cloud
+  Cloud,
+  Map as MapIcon,
+  Navigation
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -60,6 +63,7 @@ export default function Dashboard() {
   const [showHelpMenu, setShowHelpMenu] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState<'shelter' | 'medications' | 'food' | null>(null);
   const [showClimateReport, setShowClimateReport] = useState(false);
+  const [activeTab, setActiveTab] = useState<'map' | 'routes'>('map');
 
   useEffect(() => {
     loadAlerts();
@@ -701,18 +705,55 @@ export default function Dashboard() {
         </div>
 
         {/* Map View */}
-        <div className="flex-1 relative">
-          <MapView alerts={filteredAlerts} onAlertClick={handleAlertClick} />
-          
-          {/* Toggle Sidebar Button (Mobile) */}
-          {!sidebarOpen && (
+        <div className="flex-1 relative flex flex-col">
+          {/* Tab Switcher */}
+          <div className="bg-white border-b px-6 py-3 flex items-center gap-2 shadow-sm">
             <button
-              onClick={() => setSidebarOpen(true)}
-              className="absolute top-4 left-4 bg-white p-3 rounded-lg shadow-lg hover:shadow-xl transition z-10"
+              onClick={() => setActiveTab('map')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+                activeTab === 'map'
+                  ? 'bg-emerald-500 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
             >
-              <Menu className="h-6 w-6 text-gray-700" />
+              <MapIcon className="h-5 w-5" />
+              Live Map
             </button>
-          )}
+            <button
+              onClick={() => setActiveTab('routes')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-semibold transition-all ${
+                activeTab === 'routes'
+                  ? 'bg-blue-500 text-white shadow-lg'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <Navigation className="h-5 w-5" />
+              Route Planner
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 relative">
+            {activeTab === 'map' ? (
+              <>
+                <MapView alerts={filteredAlerts} onAlertClick={handleAlertClick} />
+                
+                {/* Toggle Sidebar Button (Mobile) */}
+                {!sidebarOpen && (
+                  <button
+                    onClick={() => setSidebarOpen(true)}
+                    className="absolute top-4 left-4 bg-white p-3 rounded-lg shadow-lg hover:shadow-xl transition z-10"
+                  >
+                    <Menu className="h-6 w-6 text-gray-700" />
+                  </button>
+                )}
+              </>
+            ) : (
+              <div className="w-full h-full">
+                <RouteVisualizer />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import jwt, { SignOptions } from 'jsonwebtoken';
 import { body, validationResult } from 'express-validator';
 import User from '../models/User.model';
+import env from '../config/env';
 
 // Validation rules
 export const registerValidation = [
@@ -47,8 +48,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
     });
 
     // Generate JWT
-    const jwtSecret: string = process.env.JWT_SECRET || 'fallback-secret';
-    const jwtExpires: string = process.env.JWT_EXPIRES_IN || '7d';
+    const jwtSecret: string = env.JWT_SECRET;
+    const jwtExpires: string = env.JWT_EXPIRES_IN;
 
     const token = jwt.sign(
       { userId: user.id.toString() },
@@ -98,8 +99,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
     }
 
     // Generate JWT
-    const jwtSecret: string = process.env.JWT_SECRET || 'fallback-secret';
-    const jwtExpires: string = process.env.JWT_EXPIRES_IN || '7d';
+    const jwtSecret: string = env.JWT_SECRET;
+    const jwtExpires: string = env.JWT_EXPIRES_IN;
 
     const token = jwt.sign(
       { userId: user.id.toString() },

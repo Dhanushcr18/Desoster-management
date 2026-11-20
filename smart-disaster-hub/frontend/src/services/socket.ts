@@ -1,19 +1,24 @@
 import { io, Socket } from 'socket.io-client';
-import type { Alert, ReportStats } from '../types';
+import type { Alert, ReportStats, Shipment, AgentDecision } from '../types';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const SOCKET_URL =
+  import.meta.env.VITE_SOCKET_URL ||
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:3000';
 
 class SocketService {
   private socket: Socket | null = null;
 
-  connect(token: string): Socket {
+  connect(token?: string): Socket {
     if (this.socket?.connected) {
       return this.socket;
     }
 
+    const authToken = token || localStorage.getItem('token') || localStorage.getItem('adminToken') || '';
+
     this.socket = io(SOCKET_URL, {
-      auth: { token },
-      autoConnect: true
+      auth: { token: authToken },
+      autoConnect: true,
     });
 
     this.socket.on('connect', () => {
@@ -41,7 +46,6 @@ class SocketService {
   // Join alerts room to receive real-time updates
   joinAlertsRoom(): void {
     if (this.socket?.connected) {
-      // Already auto-joined on server
       console.log('Joined alerts room');
     }
   }
@@ -56,6 +60,26 @@ class SocketService {
     this.socket?.on('report:update', callback);
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // Supply Resilience Platform Socket Listeners
+  // ─────────────────────────────────────────────────────────────
+
+  onRiskUpdate(callback: (data: { roadId: number; name: string; riskLevel: string; riskScore: number; reason: string }) => void): void {
+    this.socket?.on('risk:update', callback);
+  }
+
+  onShipmentUpdate(callback: (shipment: Shipment) => void): void {
+    this.socket?.on('shipment:update', callback);
+  }
+
+  onAgentDecision(callback: (decision: AgentDecision & { shipmentCode?: string; driverMessage?: string }) => void): void {
+    this.socket?.on('agent:decision', callback);
+  }
+
+  onReplayTick(callback: (data: any) => void): void {
+    this.socket?.on('replay:tick', callback);
+  }
+
   // Remove listeners
   offNewAlert(callback?: (alert: Alert) => void): void {
     this.socket?.off('alert:new', callback);
@@ -63,6 +87,22 @@ class SocketService {
 
   offReportUpdate(callback?: (data: { alertId: string; reportStats: ReportStats }) => void): void {
     this.socket?.off('report:update', callback);
+  }
+
+  offRiskUpdate(callback?: (data: any) => void): void {
+    this.socket?.off('risk:update', callback);
+  }
+
+  offShipmentUpdate(callback?: (data: any) => void): void {
+    this.socket?.off('shipment:update', callback);
+  }
+
+  offAgentDecision(callback?: (data: any) => void): void {
+    this.socket?.off('agent:decision', callback);
+  }
+
+  offReplayTick(callback?: (data: any) => void): void {
+    this.socket?.off('replay:tick', callback);
   }
 
   getSocket(): Socket | null {

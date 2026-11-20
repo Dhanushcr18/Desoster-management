@@ -1,24 +1,21 @@
 import request from 'supertest';
 import { app } from '../src/server';
-import mongoose from 'mongoose';
+import { connectDB } from '../src/config/database';
 import User from '../src/models/User.model';
 
 describe('Auth API Integration Tests', () => {
-  beforeAll(async () => {
-    // Connect to test database
-    const testMongoUri = process.env.MONGODB_URI_TEST || 'mongodb://localhost:27017/disaster-hub-test';
-    await mongoose.connect(testMongoUri);
-  });
+  const testEmails = ['test@example.com', 'login@example.com'];
 
-  afterAll(async () => {
-    // Clean up and disconnect
-    await User.deleteMany({});
-    await mongoose.disconnect();
+  beforeAll(async () => {
+    await connectDB();
   });
 
   beforeEach(async () => {
-    // Clear users before each test
-    await User.deleteMany({});
+    await User.destroy({ where: { email: testEmails } });
+  });
+
+  afterAll(async () => {
+    await User.destroy({ where: { email: testEmails } });
   });
 
   describe('POST /api/auth/register', () => {
@@ -26,7 +23,7 @@ describe('Auth API Integration Tests', () => {
       const userData = {
         email: 'test@example.com',
         password: 'password123',
-        name: 'Test User'
+        name: 'Test User',
       };
 
       const response = await request(app)
@@ -45,7 +42,7 @@ describe('Auth API Integration Tests', () => {
       const userData = {
         email: 'invalid-email',
         password: 'password123',
-        name: 'Test User'
+        name: 'Test User',
       };
 
       const response = await request(app)
@@ -60,7 +57,7 @@ describe('Auth API Integration Tests', () => {
       const userData = {
         email: 'test@example.com',
         password: '123',
-        name: 'Test User'
+        name: 'Test User',
       };
 
       const response = await request(app)
@@ -73,18 +70,13 @@ describe('Auth API Integration Tests', () => {
 
     it('should fail when email already exists', async () => {
       const userData = {
-        email: 'duplicate@example.com',
+        email: 'test@example.com',
         password: 'password123',
-        name: 'Test User'
+        name: 'Test User',
       };
 
-      // Register first time
-      await request(app)
-        .post('/api/auth/register')
-        .send(userData)
-        .expect(201);
+      await request(app).post('/api/auth/register').send(userData).expect(201);
 
-      // Try to register again
       const response = await request(app)
         .post('/api/auth/register')
         .send(userData)
@@ -96,20 +88,17 @@ describe('Auth API Integration Tests', () => {
 
   describe('POST /api/auth/login', () => {
     beforeEach(async () => {
-      // Register a user for login tests
-      await request(app)
-        .post('/api/auth/register')
-        .send({
-          email: 'login@example.com',
-          password: 'password123',
-          name: 'Login User'
-        });
+      await request(app).post('/api/auth/register').send({
+        email: 'login@example.com',
+        password: 'password123',
+        name: 'Login User',
+      });
     });
 
     it('should login successfully with correct credentials', async () => {
       const credentials = {
         email: 'login@example.com',
-        password: 'password123'
+        password: 'password123',
       };
 
       const response = await request(app)
@@ -125,7 +114,7 @@ describe('Auth API Integration Tests', () => {
     it('should fail with wrong password', async () => {
       const credentials = {
         email: 'login@example.com',
-        password: 'wrongpassword'
+        password: 'wrongpassword',
       };
 
       const response = await request(app)
@@ -139,7 +128,7 @@ describe('Auth API Integration Tests', () => {
     it('should fail with non-existent email', async () => {
       const credentials = {
         email: 'nonexistent@example.com',
-        password: 'password123'
+        password: 'password123',
       };
 
       const response = await request(app)

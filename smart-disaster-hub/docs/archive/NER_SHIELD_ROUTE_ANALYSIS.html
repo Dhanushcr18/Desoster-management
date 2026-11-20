@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NER-SHIELD Route Analysis - Safe vs Affected Paths</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .routes-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+        
+        .route-card {
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .route-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .route-header {
+            padding: 20px;
+            color: white;
+            font-size: 1.3em;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .safe-route .route-header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        }
+        
+        .affected-route .route-header {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        }
+        
+        .route-body {
+            padding: 25px;
+            background: #f9fafb;
+        }
+        
+        .route-title {
+            font-size: 1.4em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #1f2937;
+        }
+        
+        .path-section {
+            margin-bottom: 20px;
+        }
+        
+        .path-label {
+            font-weight: 600;
+            color: #374151;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+        
+        .path-value {
+            font-size: 1.05em;
+            color: #1f2937;
+            line-height: 1.6;
+            padding: 12px;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid;
+        }
+        
+        .safe-route .path-value {
+            border-left-color: #10b981;
+        }
+        
+        .affected-route .path-value {
+            border-left-color: #ef4444;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .metric {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            border-top: 3px solid;
+        }
+        
+        .safe-route .metric {
+            border-top-color: #10b981;
+        }
+        
+        .affected-route .metric {
+            border-top-color: #ef4444;
+        }
+        
+        .metric-label {
+            font-size: 0.85em;
+            color: #6b7280;
+            font-weight: 500;
+        }
+        
+        .metric-value {
+            font-size: 1.3em;
+            font-weight: 700;
+            color: #1f2937;
+            margin-top: 5px;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+        
+        .badge-safe {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .badge-critical {
+            background: #fee2e2;
+            color: #7f1d1d;
+        }
+        
+        .rationale {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            border-left: 4px solid;
+            font-size: 0.95em;
+            line-height: 1.6;
+        }
+        
+        .safe-route .rationale {
+            border-left-color: #10b981;
+            color: #065f46;
+        }
+        
+        .affected-route .rationale {
+            border-left-color: #ef4444;
+            color: #7f1d1d;
+        }
+        
+        .comparison-section {
+            background: #f3f4f6;
+            padding: 30px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        
+        .comparison-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #1f2937;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .comparison-table th {
+            background: #1f2937;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        .comparison-table td {
+            padding: 15px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .comparison-table tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        
+        .metric-name {
+            font-weight: 600;
+            color: #374151;
+        }
+        
+        .safe-val {
+            color: #059669;
+            font-weight: 600;
+        }
+        
+        .affected-val {
+            color: #dc2626;
+            font-weight: 600;
+        }
+        
+        .icon {
+            font-size: 1.3em;
+        }
+        
+        .footer {
+            background: #f3f4f6;
+            padding: 20px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 0.9em;
+            border-top: 1px solid #e5e7eb;
+        }
+        
+        @media (max-width: 768px) {
+            .routes-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🛣️ NER-SHIELD Route Analysis</h1>
+            <p>Navigation Paths: Safe vs Affected Routes for North Eastern Region Logistics</p>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="content">
+            <!-- Routes Grid -->
+            <div class="routes-grid">
+                <!-- Safe Route Card -->
+                <div class="route-card safe-route">
+                    <div class="route-header">
+                        <span class="icon">🟢</span>
+                        <span>CORRECT PATH (SAFE)</span>
+                    </div>
+                    <div class="route-body">
+                        <div class="route-title">ROUTE-ALTERNATE</div>
+                        <div class="route-title" style="font-size: 1.1em; color: #059669;">Route B: AI-Optimized Bypass via NH-27</div>
+                        
+                        <div class="path-section">
+                            <div class="path-label">📍 Navigation Path</div>
+                            <div class="path-value">
+                                Guwahati → Nagaon → Lumding Bypass → Dimapur → Kohima → Imphal
+                            </div>
+                        </div>
+                        
+                        <div class="metrics-grid">
+                            <div class="metric">
+                                <div class="metric-label">Distance</div>
+                                <div class="metric-value">~530 km</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">ETA</div>
+                                <div class="metric-value">12h 00m</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Risk Level</div>
+                                <div class="metric-value">LOW</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Risk %</div>
+                                <div class="metric-value">14%</div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 15px;">
+                            <span class="badge badge-safe">✅ Status: Clear</span>
+                        </div>
+                        
+                        <div class="rationale">
+                            <strong>✅ Recommendation:</strong> Avoids high-risk flood & landslide corridor on NH-6 Dima Hasao. Safe grade roads with active BRO patrols guarantee arrival reliability.
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Affected Route Card -->
+                <div class="route-card affected-route">
+                    <div class="route-header">
+                        <span class="icon">🔴</span>
+                        <span>AFFECTED PATH (BLOCKED)</span>
+                    </div>
+                    <div class="route-body">
+                        <div class="route-title">ROUTE-PRIMARY</div>
+                        <div class="route-title" style="font-size: 1.1em; color: #dc2626;">Route A: Direct NH-6 via Shillong & Haflong</div>
+                        
+                        <div class="path-section">
+                            <div class="path-label">📍 Navigation Path</div>
+                            <div class="path-value">
+                                Guwahati → Shillong → Haflong → Silchar → Dimapur → Kohima → Imphal
+                            </div>
+                        </div>
+                        
+                        <div class="metrics-grid">
+                            <div class="metric">
+                                <div class="metric-label">Status</div>
+                                <div class="metric-value">BLOCKED</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Risk Level</div>
+                                <div class="metric-value">CRITICAL</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Risk %</div>
+                                <div class="metric-value">88%</div>
+                            </div>
+                            <div class="metric">
+                                <div class="metric-label">Blockage Location</div>
+                                <div class="metric-value">Km 142</div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-top: 15px;">
+                            <span class="badge badge-critical">🚫 DISRUPTED</span>
+                        </div>
+                        
+                        <div class="rationale">
+                            <strong>⚠️ Issue:</strong> Physical blockage due to major landslide at Km 142. Heavy rainfall ongoing with high probability (88%) of secondary flash floods & landslides. Road quality severely damaged at pass.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Comparison Section -->
+            <div class="comparison-section">
+                <div class="comparison-title">📊 Route Comparison Matrix</div>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th class="safe-val">✅ SAFE ROUTE (B)</th>
+                            <th class="affected-val">🔴 AFFECTED ROUTE (A)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="metric-name">Route ID</td>
+                            <td class="safe-val">ROUTE-ALTERNATE</td>
+                            <td class="affected-val">ROUTE-PRIMARY</td>
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Distance</td>
+                            <td class="safe-val">~530 km</td>
+                            <td class="affected-val">~450 km (Blocked)</td>
+                        </tr>
+                        <tr>
+                            <td class="metric-name">ETA</td>
+                            <td class="safe-val">12h 00m</td>
+                            <td class="affected-val">N/A (Impassable)</td>
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Risk Level</td>
+                            <td class="safe-val">LOW (14%)</td>
+                            <td class="affected-val">CRITICAL (88%)</td>
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Current Status</td>
+                            <td class="safe-val">✅ Clear / Open</td>
+                            <td class="affected-val">🔴 Landslide Blockage</td>
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Primary Highway</td>
+                            <td class="safe-val">NH-27 (Nagaon & Dimapur Bypass)</td>
+                            <td class="affected-val">NH-6 (Dima Hasao - Blocked)</td>
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Hazard Risk</td>
+                            <td class="safe-val">Low flood & landslide probability</td>
+                            <td class="affected-val">88% flash flood & landslide risk</td>
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Road Quality</td>
+                            <td class="safe-val">Good to Excellent</td>
+                            <td class="affected-val">Severely Damaged at Pass</td>
+                        </tr>
+                        <tr>
+                            <td class="metric-name">Recommendation</td>
+                            <td class="safe-val">✅ USE THIS ROUTE</td>
+                            <td class="affected-val">🚫 AVOID</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Key Insights -->
+            <div class="comparison-section" style="margin-top: 20px; background: #f0f9ff; border-left: 4px solid #0284c7;">
+                <div class="comparison-title" style="color: #0c4a6e;">💡 Key Insights & Recommendations</div>
+                <div style="padding: 0 20px; color: #0c4a6e;">
+                    <ul style="margin-left: 20px; line-height: 1.8; font-size: 1em;">
+                        <li><strong>Use ROUTE-ALTERNATE (Green Path)</strong> for all logistics and medical supply deliveries to Imphal Valley</li>
+                        <li><strong>Avoid ROUTE-PRIMARY (Red Path)</strong> completely until landslide blockage is cleared and roads are repaired</li>
+                        <li><strong>Safety Priority:</strong> The AI system applies 3.5x risk aversion multiplier for high-priority medical cargo, prioritizing arrival reliability over distance savings</li>
+                        <li><strong>Active Monitoring:</strong> NH-27 Bypass maintains active BRO (Border Roads Organization) patrols for enhanced safety</li>
+                        <li><strong>Deployment Strategy:</strong> All commercial convoys and medical supply vehicles should be rerouted via the safe NH-27 corridor immediately</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p>NER-SHIELD Route Analysis Report | Generated: 2026-09-01 | Data Source: GitHub Repository - Team-Qua-n-tum/NER-SHIELD</p>
+        </div>
+    </div>
+</body>
+</html>

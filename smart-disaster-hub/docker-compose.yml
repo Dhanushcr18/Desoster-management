@@ -24,10 +24,13 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
-      - MONGODB_URI=mongodb://mongodb:27017/disaster-hub
-      - JWT_SECRET=hackathon-jwt-secret-change-in-production
+      - JWT_SECRET=hackathon-jwt-secret-min-32-chars-change-in-production
       - JWT_EXPIRES_IN=7d
       - NODE_ENV=development
+      - OSRM_URL=https://router.project-osrm.org
+      - AGENT_INTERVAL_MIN=5
+      - SIM_SPEED=60
+      - BLOCKED_ROAD_DELAY_MIN=360
     depends_on:
       - mongodb
     networks:
